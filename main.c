@@ -24,14 +24,10 @@ void printError() {
 	printf("Input error!\n");
 }
 
-int main(int argc, char *argv[]) {
-	char curString[SIZE];
-	char* command;
+void parseLine(char line[], int argc, char* argv[]) {
 	char* commandSave = NULL;
 	char* cwordSave = NULL;
-	
-	while (fgets(curString, sizeof(curString), stdin)) {
-		command = strtok_r(curString, ";\n", &commandSave); // считываем отдельную команду со всеми аргументами до ; или перехода
+	char* command = strtok_r(line, ";\n", &commandSave); // считываем отдельную команду со всеми аргументами до ; или перехода
 
 		while (command != NULL) { // now parsing command
 			argc = 0;
@@ -53,7 +49,13 @@ int main(int argc, char *argv[]) {
 			}
 
 			command = strtok_r(NULL, ";\n", &commandSave);
-		}
+	}
+}
+
+int main(int argc, char *argv[]) {
+	char line[SIZE];
+	while (fgets(line, sizeof(line), stdin)) {
+		parseLine(line, argc, argv);
 	}
 	return 0;
 }
