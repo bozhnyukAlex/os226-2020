@@ -75,24 +75,6 @@ static int readmem(int argc, char *argv[]) {
 	static inline int os_print(char* argv, int len) {
 		return (int) os_syscall(os_syscall_nr_print, (unsigned long) argv, (unsigned long) len, 0, 0, (void *) 0);
 	}
-
-	static inline long os_syscall(int syscall,
-		unsigned long arg1, unsigned long arg2,
-		unsigned long arg3, unsigned long arg4,
-		void *rest) {
-	long ret;
-	__asm__ __volatile__(
-		"int $0x81\n"
-		: "=a"(ret)
-		: "a"(syscall), // rax
-		  "b"(arg1),    // rbx
-		  "c"(arg2),    // rcx
-		  "d"(arg3),    // rdx
-		  "S"(arg4),    // rsi
-		  "D"(rest)     // rdi
-		:
-	);
-	return ret;
 }
 
 */
