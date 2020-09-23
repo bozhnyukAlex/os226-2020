@@ -16,6 +16,7 @@
 APPS_X(DECLARE)
 #undef DECLARE
 
+
 static int g_retcode;
 
 static const struct app {
@@ -26,6 +27,7 @@ static const struct app {
 	APPS_X(ELEM)
 #undef ELEM
 };
+
 
 static int exec(int argc, char *argv[]) {
 	const struct app *app = NULL;
@@ -67,6 +69,33 @@ static int readmem(int argc, char *argv[]) {
 	printf("%d\n", *(int*)ptr);
 	return 0;
 }
+
+/* DEFINE(print, int, 2, char*, argv, int, len) ---> DEFINE2(int, print, char*, argv, int, len) ---->
+	 --> 
+	static inline int os_print(char* argv, int len) {
+		return (int) os_syscall(os_syscall_nr_print, (unsigned long) argv, (unsigned long) len, 0, 0, (void *) 0);
+	}
+
+	static inline long os_syscall(int syscall,
+		unsigned long arg1, unsigned long arg2,
+		unsigned long arg3, unsigned long arg4,
+		void *rest) {
+	long ret;
+	__asm__ __volatile__(
+		"int $0x81\n"
+		: "=a"(ret)
+		: "a"(syscall), // rax
+		  "b"(arg1),    // rbx
+		  "c"(arg2),    // rcx
+		  "d"(arg3),    // rdx
+		  "S"(arg4),    // rsi
+		  "D"(rest)     // rdi
+		:
+	);
+	return ret;
+}
+
+*/
 
 static int sysecho(int argc, char *argv[]) {
 	for (int i = 1; i < argc - 1; ++i) {

@@ -1,11 +1,11 @@
 #pragma once
 
 #define SYSCALL_X(x) \
-	x(print, int, 2, char*, argv, int, len) \
+	x(print, int, 2, char*, argv, int, len) \    
 
 #define SC_NR(name, ...) os_syscall_nr_ ## name,
 enum syscalls_num {
-	SYSCALL_X(SC_NR)
+	SYSCALL_X(SC_NR)  //SC_NR(print, int, 2, char*, argv, int, len) ---> os_syscall_nr_print,
 };
 #undef SC_NR
 
@@ -29,7 +29,7 @@ static inline long os_syscall(int syscall,
 }
 
 #define DEFINE0(ret, name) \
-	static inline ret os_ ## name (void) { \
+	static inline ret os_ ## name (void) { \    
 		return (ret) os_syscall(os_syscall_nr_ ## name, 0, 0, 0, 0, (void *) 0); \
 	}
 #define DEFINE1(ret, name, type1, name1) \
@@ -51,13 +51,20 @@ static inline long os_syscall(int syscall,
 				(unsigned long) name3, (unsigned long) name4, (void *) 0); \
 	}
 #define DEFINE5(ret, name, type1, name1, type2, name2, type3, name3, type4, name4, type5, name5) \
-	static inline ret os_ ## name (type1 name1, type2 name2, type3 name3, type4 name4) { \
+	static inline ret os_ ## name (type1 name1, type2 name2, type3 name3, type4 name4, type5 name5) { \
 		return (ret) os_syscall(os_syscall_nr_ ## name, (unsigned long) name1, (unsigned long) name2, \
 				(unsigned long) name3, (unsigned long) name4, (void *) name5); \
 	}
 #define DEFINE(name, ret, n, ...) \
 	DEFINE ## n (ret, name, ## __VA_ARGS__)
 SYSCALL_X(DEFINE)
+/* DEFINE(print, int, 2, char*, argv, int, len) ---> DEFINE2(int, print, char*, argv, int, len) ---->
+	 --> 
+	static inline int os_print(char* argv, int len) {
+		return (int) os_syscall(os_syscall_nr_print, (unsigned long) argv, (unsigned long) len, 0, 0, (void *) 0);
+	}
+
+*/
 #undef DEFINE0
 #undef DEFINE1
 #undef DEFINE2
