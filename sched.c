@@ -94,6 +94,7 @@ void exec_prio() {
 			}
 		}
 		else if (cur_task_prior_cnt > 1) {
+			qsort(&taskpool[i], cur_task_prior_cnt, sizeof(struct task), index_cmp);
 			exec_fifo(i, i + cur_task_prior_cnt);
 			i += (cur_task_prior_cnt - 1);
 		}
