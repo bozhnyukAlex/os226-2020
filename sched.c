@@ -18,6 +18,7 @@ static struct task taskpool[POOL_SIZE];
 static int taskpool_n;
 static enum policy policy;
 int prior_cnt[PRIOR_RANGE_MAX];
+int zero_deadline_cnt;
 
 
 void sched_new(void (*entrypoint)(void *aspace),
@@ -30,8 +31,13 @@ void sched_new(void (*entrypoint)(void *aspace),
 	t->entry = entrypoint;
 	t->ctx = aspace;
 	t->priority = priority;
+	if (deadline <= 0) {
+		deadline = 0;
+		zero_deadline_cnt++;
+	}
 	t->deadline = deadline;
 	prior_cnt[priority]++;
+	
 	
 }
 
@@ -47,6 +53,10 @@ int prior_cmp(struct task *t1, struct task *t2){
 
 int index_cmp(struct task *t1, struct task *t2) {
 	return t1->index - t2->index;
+}
+
+int deadline_cmp(struct task *t1, struct task *t2) {
+	return t1->deadline - t2->deadline;
 }
 
 void sched_time_elapsed(unsigned amount) {
@@ -82,9 +92,8 @@ void exec_fifo(int start_closed, int end_unclosed) {
 	}
 }
 
-void exec_prio() {
-	qsort(taskpool, taskpool_n, sizeof(struct task), prior_cmp);
-	for (int i = 0; i < taskpool_n; i++) {
+void exec_prio_alg(int start_closed, int end_unclosed) {
+	for (int i = start_closed; i < end_unclosed; i++) {
 		int cur_priority = taskpool[i].priority;
 		int cur_task_prior_cnt = prior_cnt[cur_priority];
 
@@ -99,9 +108,37 @@ void exec_prio() {
 			i += (cur_task_prior_cnt - 1);
 		}
 	}
+} 
+
+void exec_prio() {
+	qsort(taskpool, taskpool_n, sizeof(struct task), prior_cmp);
+	exec_prio_alg(0, taskpool_n);
 }
 
-
+void exec_deadline() {
+	qsort(taskpool, taskpool_n, sizeof(struct task), deadline_cmp);
+	for (int i = zero_deadline_cnt; i < taskpool_n; i++) {
+		int dead_cnt = 0, 
+			j = i;
+		int cur_deadline = taskpool[i].deadline;
+		while (taskpool[j].deadline == cur_deadline) {
+			dead_cnt++;
+			j++;
+		}
+		if (dead_cnt == 1) {
+			while (task_cnt_more_zero(i)) {
+				taskpool[i].entry(taskpool[i].ctx);
+			}
+		} 
+		else if (dead_cnt > 1) {
+			qsort(&taskpool[i], dead_cnt, sizeof(struct task), prior_cmp);
+			exec_prio_alg(i, i + dead_cnt);
+			i += (dead_cnt - 1);
+		}
+	}
+	qsort(taskpool, zero_deadline_cnt, sizeof(struct task), prior_cmp);
+	exec_prio_alg(0, zero_deadline_cnt);
+}
 
 
 
@@ -116,6 +153,7 @@ void sched_run(void) {
 			break;
 
 		case POLICY_DEADLINE:
+			exec_deadline();
 			break;
 		default:
 			break;
