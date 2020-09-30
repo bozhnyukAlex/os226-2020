@@ -4,8 +4,6 @@
 
 #include <unistd.h>
 
-int sys_print(char *str, int len) {
-
 typedef unsigned long (*sys_call_t)(
                 unsigned long arg1, unsigned long arg2,
                 unsigned long arg3, unsigned long arg4,
