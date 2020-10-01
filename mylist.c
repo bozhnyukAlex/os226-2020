@@ -139,7 +139,23 @@ void clearList(struct List* list) {
     list->length = 0;
 }
 
+int indexOf(struct List *list, struct Node *toFind) {
+    int i = 0;
+    struct Node *curr = list->head;
+    while (i < list->length) {
+        if (curr == toFind) {
+            return i;
+        }
+        curr = curr->next;
+        i++;
+    }
+    return NULL;
+}
+
 void shiftRight(struct List* list, int pos, int shift) {
+    if (shift == 0) {
+        return;
+    }
     if (pos + shift > list->length - 1) {
         struct Node* toDelete = getN(list, pos);
         push(list, toDelete->data);

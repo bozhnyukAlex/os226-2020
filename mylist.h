@@ -26,6 +26,7 @@ void deleteCycle(struct List* list);
 void reverseList(struct List* list);
 void printList(struct List *list);
 void shiftRight(struct List* list, int pos, int shift);
+int indexOf(struct List *list, struct Node *toFind);
 
 
 #endif // MYLIST_H_INCLUDED

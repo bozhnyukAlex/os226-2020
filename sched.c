@@ -23,7 +23,9 @@ static enum policy policy;
 int prior_cnt[PRIOR_RANGE_MAX];
 int zero_deadline_cnt;
 int was_tick;
+int timeout_was_set;
 struct List list;
+struct task *curWait;
 
 
 void sched_new(void (*entrypoint)(void *aspace),
@@ -42,6 +44,7 @@ void sched_new(void (*entrypoint)(void *aspace),
 		zero_deadline_cnt++;
 	}
 	t->deadline = deadline;
+	t->counter = *((int*)t->ctx);
 	prior_cnt[priority]++;
 	
 	
@@ -50,9 +53,13 @@ void sched_new(void (*entrypoint)(void *aspace),
 void sched_cont(void (*entrypoint)(void *aspace),
 		void *aspace,
 		int timeout) {
+	if (timeout > 0) {
+		timeout_was_set++;
+	}
 	for (int i = 0; i < taskpool_n; i++) {
 		if (taskpool[i].ctx == aspace) {
 			taskpool[i].timer = timeout;
+			curWait = &taskpool[i];
 		}
 	}
 }
@@ -145,16 +152,46 @@ void exec_deadline() {
 	exec_prio_alg(0, zero_deadline_cnt);
 }
 
+void round_robin_push(int start_closed, int end_unclosed) {
+	while (any_count_more_zero(start_closed, end_unclosed)) {
+		for (int i = start_closed; i < end_unclosed; i++) {
+			if (taskpool[i].counter >= 0) {
+				push(&list, &taskpool[i]);
+				taskpool[i].counter--;
+			}
+		}
+	}
+}
+
 
 
 void sched_run(void) {
 	qsort(taskpool, taskpool_n, sizeof(struct task), policy_cmp);
 	list = createList();
-	for (int i = 0; i < taskpool_n; i++) {
-		push(&list, &taskpool[i]);
+
+	switch (policy) {
+		case POLICY_FIFO: {
+			round_robin_push(0, taskpool_n);
+			break;
+		}
 	}
-	printList(&list);
-	
+
+	while (list.head) {
+		list.head->data->entry(list.head->data->ctx);
+		deleteHead(&list);
+		struct Node* cur = list.head;
+		if (timeout_was_set) {
+			while (cur->data != curWait) {
+				cur = cur->next;
+			}
+			while (cur->data == curWait) {
+				shiftRight(&list, indexOf(&list, cur), cur->data->timer);
+				cur = cur->next;
+			}
+			timeout_was_set = 0;
+		}
+		
+	}
 	
 }
 
@@ -195,6 +232,15 @@ int deadline_cmp(struct task *t1, struct task *t2) {
 
 int can_be_entried(int i) {
 	return *((int*)taskpool[i].ctx) >= 0; // access to ctx->cnt
+}
+
+int any_count_more_zero(int start_closed, int end_unclosed) {
+	for(int i = start_closed; i < end_unclosed; i++) {
+		if (taskpool[i].counter >= 0) {
+			return 1;
+		}
+	}
+	return 0;
 }
 
 int any_task_can_be_entried(int start_closed, int end_unclosed) {

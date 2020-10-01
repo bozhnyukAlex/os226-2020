@@ -7,6 +7,7 @@ struct task {
 	int deadline;
 	int index;
 	int timer;
+	int counter;
 };
 
 enum policy {
