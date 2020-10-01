@@ -176,7 +176,7 @@ void shiftRight(struct List* list, int pos, int shift) {
 void printList(struct List *list) {
     struct Node* curr = list->head;
     while (curr) {
-        printf("i: %d, prior: %d, deadline: %d\n", curr->data->index, curr->data->priority, curr->data->deadline);
+        printf("i: %d, prior: %d, deadline: %d, cnt: %d\n", curr->data->index, curr->data->priority, curr->data->deadline, *((int*)curr->data->ctx));
         curr = curr->next;
     }
 }

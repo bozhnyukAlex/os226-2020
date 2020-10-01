@@ -163,6 +163,24 @@ void round_robin_push(int start_closed, int end_unclosed) {
 	}
 }
 
+void priority_push(int start_closed, int end_unclosed) {
+	for (int i = start_closed; i < end_unclosed; i++) {
+		int cur_priority = taskpool[i].priority;
+		int cur_task_prior_cnt = prior_cnt[cur_priority];
+		if (cur_task_prior_cnt == 1) {
+			while (taskpool[i].counter >= 0) {
+				push(&list, &taskpool[i]);
+				taskpool[i].counter--;
+			}
+		}
+		else if (cur_task_prior_cnt > 1) {
+			round_robin_push(i, i + cur_task_prior_cnt);
+			i += (cur_task_prior_cnt - 1);
+		}
+	}
+
+}
+
 
 
 void sched_run(void) {
@@ -174,21 +192,46 @@ void sched_run(void) {
 			round_robin_push(0, taskpool_n);
 			break;
 		}
+		case POLICY_PRIO: {
+			priority_push(0, taskpool_n);
+			break;
+		}
+		case POLICY_DEADLINE: {
+			for (int i = zero_deadline_cnt; i < taskpool_n; i++) {
+				int dead_cnt = 0, 
+					j = i;
+				int cur_deadline = taskpool[i].deadline;
+				while (taskpool[j].deadline == cur_deadline) {
+					dead_cnt++;
+					j++;
+				}
+				if (dead_cnt == 1) {
+					while (taskpool[i].counter >= 0) {
+						push(&list, &taskpool[i]);
+						taskpool[i].counter--;
+					}
+				}
+				else if (dead_cnt > 1) {
+					priority_push(i, i + dead_cnt);
+					i += (dead_cnt - 1);
+				}
+			}
+			priority_push(0, zero_deadline_cnt);
+
+		}
 	}
+
+	printList(&list);
+	printf("---------\n");
+
 
 	while (list.head) {
 		list.head->data->entry(list.head->data->ctx);
 		deleteHead(&list);
 		struct Node* cur = list.head;
 		if (timeout_was_set) {
-			while (cur->data != curWait) {
-				cur = cur->next;
-			}
-			while (cur->data == curWait) {
-				shiftRight(&list, indexOf(&list, cur), cur->data->timer);
-				cur = cur->next;
-			}
-			timeout_was_set = 0;
+			printf("curWait i: %d, prior: %d, deadline: %d, cnt: %d, timer: %d\n", curWait->index, curWait->priority, curWait->deadline, *((int*)curWait->ctx), curWait->timer);
+			
 		}
 		
 	}
