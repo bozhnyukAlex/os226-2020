@@ -22,7 +22,6 @@ static int taskpool_n;
 static enum policy policy;
 int prior_cnt[PRIOR_RANGE_MAX];
 int zero_deadline_cnt;
-int was_tick;
 int timeout_was_set;
 struct List list;
 struct task *curWait;

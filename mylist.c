@@ -151,33 +151,6 @@ int indexOf(struct List *list, struct Node *toFind) {
     }
     return NULL;
 }
-
-void shiftRight(struct List* list, int pos, int shift) {
-    if (shift == 0) {
-        return;
-    }
-    if (pos + shift > list->length - 1) {
-        struct Node* toDelete = getN(list, pos);
-        push(list, toDelete->data);
-        deleteNode(list, pos);
-        return; 
-    }
-    if (pos == 0) {
-        insertAfterEl(list, shift, list->head->data);
-        deleteHead(list);
-        return;
-    }
-    struct Node* toShift = getN(list, pos);
-    insertAfterEl(list, pos + shift, toShift->data);
-    deleteNode(list, pos); 
-}
-
-void shiftLeft(struct List* list, int pos, int shift) {
-    reverseList(list);
-    shiftRight(list, pos, shift);
-    reverseList(list);
-}
-
 void shiftRightPiece(struct List *list, int pos1, int pos2, int shift) {
     struct Node* inPos1 = getN(list, pos1);
     struct Node* inPos2 = getN(list, pos2);
