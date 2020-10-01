@@ -3,6 +3,7 @@
 
 #define POOL_SIZE 16
 #define PRIOR_RANGE_MAX 11
+#define READY_TO_EXECUTE 0
 
 struct task {
 	void (*entry)(void *ctx);
@@ -10,10 +11,20 @@ struct task {
 	int priority;
 	int deadline;
 	int index;
+	int timer;
 };
 
+int fifo_cmp(struct task *t1, struct task *t2);
+int prior_cmp(struct task *t1, struct task *t2);
+int index_cmp(struct task *t1, struct task *t2);
+int deadline_cmp(struct task *t1, struct task *t2);
+
+int can_be_entried(int i);
+int any_task_can_be_entried(int start_closed, int end_unclosed);
 
 
+
+static int (*policy_cmp)(struct task *t1, struct task *t2);
 static struct task taskpool[POOL_SIZE];
 static int taskpool_n;
 static enum policy policy;
@@ -31,6 +42,7 @@ void sched_new(void (*entrypoint)(void *aspace),
 	t->entry = entrypoint;
 	t->ctx = aspace;
 	t->priority = priority;
+	t->timer = READY_TO_EXECUTE;
 	if (deadline <= 0) {
 		deadline = 0;
 		zero_deadline_cnt++;
@@ -44,48 +56,46 @@ void sched_new(void (*entrypoint)(void *aspace),
 void sched_cont(void (*entrypoint)(void *aspace),
 		void *aspace,
 		int timeout) {
-	// ...
+	for (int i = 0; i < taskpool_n; i++) {
+		if (taskpool[i].ctx == aspace) {
+			taskpool[i].timer = timeout;
+		}
+	}
 }
 
-int prior_cmp(struct task *t1, struct task *t2){
-	return t2->priority - t1->priority;
-}
 
-int index_cmp(struct task *t1, struct task *t2) {
-	return t1->index - t2->index;
-}
-
-int deadline_cmp(struct task *t1, struct task *t2) {
-	return t1->deadline - t2->deadline;
-}
 
 void sched_time_elapsed(unsigned amount) {
-	// ...
+	for (int i = 0; i < taskpool_n; i++) {
+		if (taskpool[i].timer != READY_TO_EXECUTE) {
+			taskpool[i].timer--;
+		}
+	}
 }
 
 void sched_set_policy(enum policy _policy) {
 	policy = _policy;
-	// ...
-}
-
-int task_cnt_more_zero(int i) {
-	return *((int*)taskpool[i].ctx) >= 0; // access to ctx->cnt
-}
-
-int any_task_can_be_entried(int start_closed, int end_unclosed) {
-	for (int i = start_closed; i < end_unclosed; i++) {
-		if (task_cnt_more_zero(i)) { 
-			return 1;
-		}
+	switch (policy) {
+		case POLICY_FIFO:
+			policy_cmp = fifo_cmp;
+			break;
+		case POLICY_PRIO:
+			policy_cmp = prior_cmp;
+			break;
+		case POLICY_DEADLINE: 
+			policy_cmp = deadline_cmp;
+			break;
+		default:
+			printf("Unknown policy\n");
+			abort();
+			break;
 	}
-	return 0;
 }
 
 void exec_fifo(int start_closed, int end_unclosed) {
 	while(any_task_can_be_entried(start_closed, end_unclosed)) {
 		for (int i = start_closed; i < end_unclosed; i++) {
-			if (task_cnt_more_zero(i)) {
-				//sched_cont(taskpool[i].entry, taskpool[i].ctx, 0);
+			if (can_be_entried(i)) {
 				taskpool[i].entry(taskpool[i].ctx);
 			}
 		}
@@ -98,7 +108,7 @@ void exec_prio_alg(int start_closed, int end_unclosed) {
 		int cur_task_prior_cnt = prior_cnt[cur_priority];
 
 		if (cur_task_prior_cnt == 1) {
-			while (task_cnt_more_zero(i)) {
+			while (can_be_entried(i)) {
 				taskpool[i].entry(taskpool[i].ctx);
 			}
 		}
@@ -126,7 +136,7 @@ void exec_deadline() {
 			j++;
 		}
 		if (dead_cnt == 1) {
-			while (task_cnt_more_zero(i)) {
+			while (can_be_entried(i)) {
 				taskpool[i].entry(taskpool[i].ctx);
 			}
 		} 
@@ -143,9 +153,17 @@ void exec_deadline() {
 
 
 void sched_run(void) {
+	qsort(taskpool, taskpool_n, sizeof(struct task), policy_cmp);
+
 	switch (policy){
 		case POLICY_FIFO:
-			exec_fifo(0, taskpool_n);
+			while (any_task_can_be_entried(0, taskpool_n)) {
+				for (int i = 0; i < taskpool_n; i++) {
+					if (taskpool[i].timer == READY_TO_EXECUTE && can_be_entried(i)) {
+						taskpool[i].entry(taskpool[i].ctx);
+					}
+				}
+			}
 			break;
 		
 		case POLICY_PRIO:
@@ -159,4 +177,52 @@ void sched_run(void) {
 			break;
 	}
 	
+}
+
+
+
+
+
+
+
+
+
+
+
+int fifo_cmp(struct task *t1, struct task *t2){
+	return -1;
+}
+
+int prior_cmp(struct task *t1, struct task *t2){
+	int delta = t2->priority - t1->priority;
+	if (delta) {
+		return delta;
+	}
+	return index_cmp(t1, t2);
+}
+
+int index_cmp(struct task *t1, struct task *t2) {
+	return t1->index - t2->index;
+}
+
+int deadline_cmp(struct task *t1, struct task *t2) {
+	int delta = t1->deadline - t2->deadline;
+	if (delta) {
+		return delta;
+	}
+	return prior_cmp(t1, t2);
+}
+
+
+int can_be_entried(int i) {
+	return *((int*)taskpool[i].ctx) >= 0; // access to ctx->cnt
+}
+
+int any_task_can_be_entried(int start_closed, int end_unclosed) {
+	for (int i = start_closed; i < end_unclosed; i++) {
+		if (can_be_entried(i)) { 
+			return 1;
+		}
+	}
+	return 0;
 }
