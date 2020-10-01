@@ -223,16 +223,30 @@ void sched_run(void) {
 
 	printList(&list);
 	printf("---------\n");
+	shiftRightPiece(&list, 1, 4, 2);
+	printList(&list);
+	printf("---------\n");
 
 
 	while (list.head) {
 		list.head->data->entry(list.head->data->ctx);
 		deleteHead(&list);
 		struct Node* cur = list.head;
+		//printf("Deleting Node...----------\n");
+		//printList(&list);
+		//printf("------------\n");
 		if (timeout_was_set) {
-			printf("curWait i: %d, prior: %d, deadline: %d, cnt: %d, timer: %d\n", curWait->index, curWait->priority, curWait->deadline, *((int*)curWait->ctx), curWait->timer);
+		//	printf("curWait i: %d, prior: %d, deadline: %d, cnt: %d, timer: %d\n", curWait->index, curWait->priority, curWait->deadline, *((int*)curWait->ctx), curWait->timer);
+			for (int i = 0; i < curWait->timer; i++) {
+				for (int j = 0; j < *((int*)curWait->ctx); j++) {
+					shiftRight(&list, j, 1);
+				}
+			}
 			
+		//	printf("Shifting...---------\n");
+		//	printList(&list);
 		}
+
 		
 	}
 	

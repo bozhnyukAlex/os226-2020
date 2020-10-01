@@ -169,14 +169,46 @@ void shiftRight(struct List* list, int pos, int shift) {
     }
     struct Node* toShift = getN(list, pos);
     insertAfterEl(list, pos + shift, toShift->data);
-    deleteNode(list, pos);
+    deleteNode(list, pos); 
+}
+
+void shiftLeft(struct List* list, int pos, int shift) {
+    reverseList(list);
+    shiftRight(list, pos, shift);
+    reverseList(list);
+}
+
+void shiftRightPiece(struct List *list, int pos1, int pos2, int shift) {
+    struct Node* inPos1 = getN(list, pos1);
+    struct Node* inPos2 = getN(list, pos2);
+    if (pos1 == 0) {
+        struct Node* afterPos2 = getN(list, pos2 + 1);
+        struct Node* toShift = getN(list, pos2 + shift + 1);
+        struct Node* beforeToShift = getN(list, pos2 + shift);
+        list->head = afterPos2;
+        beforeToShift->next = inPos1;
+        inPos2->next = toShift;
+        return;
+    }
+    struct Node* afterPos2 = getN(list, pos2 + 1);
+    struct Node* beforePos1 = getN(list, pos1 - 1);
+    struct Node* toShift = getN(list, pos2 + shift + 1);
+    struct Node* beforeToShift = getN(list, pos2 + shift);
+
+    beforePos1->next = afterPos2;
+    beforeToShift->next = inPos1;
+    inPos2->next = toShift;
     
+
+
 }
 
 void printList(struct List *list) {
     struct Node* curr = list->head;
+    int index = 0;
     while (curr) {
-        printf("i: %d, prior: %d, deadline: %d, cnt: %d\n", curr->data->index, curr->data->priority, curr->data->deadline, *((int*)curr->data->ctx));
+        printf("i: %d, index: %d, prior: %d, deadline: %d, cnt: %d\n", index,  curr->data->index, curr->data->priority, curr->data->deadline, *((int*)curr->data->ctx));
+        index++;
         curr = curr->next;
     }
 }
