@@ -72,7 +72,6 @@ void sched_time_elapsed(unsigned amount) {
 			taskpool[i].timer--;
 		}
 	}
-	was_tick++;
 }
 
 void sched_set_policy(enum policy _policy) {
@@ -92,64 +91,6 @@ void sched_set_policy(enum policy _policy) {
 			abort();
 			break;
 	}
-}
-
-void exec_fifo(int start_closed, int end_unclosed) {
-	while(any_task_can_be_entried(start_closed, end_unclosed)) {
-		for (int i = start_closed; i < end_unclosed; i++) {
-			if (can_be_entried(i)) {
-				taskpool[i].entry(taskpool[i].ctx);
-			}
-		}
-	}
-}
-
-void exec_prio_alg(int start_closed, int end_unclosed) {
-	for (int i = start_closed; i < end_unclosed; i++) {
-		int cur_priority = taskpool[i].priority;
-		int cur_task_prior_cnt = prior_cnt[cur_priority];
-
-		if (cur_task_prior_cnt == 1) {
-			while (can_be_entried(i)) {
-				taskpool[i].entry(taskpool[i].ctx);
-			}
-		}
-		else if (cur_task_prior_cnt > 1) {
-			qsort(&taskpool[i], cur_task_prior_cnt, sizeof(struct task), index_cmp);
-			exec_fifo(i, i + cur_task_prior_cnt);
-			i += (cur_task_prior_cnt - 1);
-		}
-	}
-} 
-
-void exec_prio() {
-	qsort(taskpool, taskpool_n, sizeof(struct task), prior_cmp);
-	exec_prio_alg(0, taskpool_n);
-}
-
-void exec_deadline() {
-	qsort(taskpool, taskpool_n, sizeof(struct task), deadline_cmp);
-	for (int i = zero_deadline_cnt; i < taskpool_n; i++) {
-		int dead_cnt = 0, 
-			j = i;
-		int cur_deadline = taskpool[i].deadline;
-		while (taskpool[j].deadline == cur_deadline) {
-			dead_cnt++;
-			j++;
-		}
-		if (dead_cnt == 1) {
-			while (can_be_entried(i)) {
-				taskpool[i].entry(taskpool[i].ctx);
-			}
-		} 
-		else if (dead_cnt > 1) {
-			qsort(&taskpool[i], dead_cnt, sizeof(struct task), prior_cmp);
-			exec_prio_alg(i, i + dead_cnt);
-			i += (dead_cnt - 1);
-		}
-	}
-	qsort(taskpool, zero_deadline_cnt, sizeof(struct task), prior_cmp);
-	exec_prio_alg(0, zero_deadline_cnt);
 }
 
 void round_robin_push(int start_closed, int end_unclosed) {
@@ -221,30 +162,18 @@ void sched_run(void) {
 		}
 	}
 
-	printList(&list);
-	printf("---------\n");
-	shiftRightPiece(&list, 1, 4, 2);
-	printList(&list);
-	printf("---------\n");
-
 
 	while (list.head) {
 		list.head->data->entry(list.head->data->ctx);
 		deleteHead(&list);
 		struct Node* cur = list.head;
-		//printf("Deleting Node...----------\n");
-		//printList(&list);
-		//printf("------------\n");
 		if (timeout_was_set) {
-		//	printf("curWait i: %d, prior: %d, deadline: %d, cnt: %d, timer: %d\n", curWait->index, curWait->priority, curWait->deadline, *((int*)curWait->ctx), curWait->timer);
-			for (int i = 0; i < curWait->timer; i++) {
-				for (int j = 0; j < *((int*)curWait->ctx); j++) {
-					shiftRight(&list, j, 1);
-				}
+			while (cur && cur->data != curWait) {
+				cur = cur->next;
 			}
-			
-		//	printf("Shifting...---------\n");
-		//	printList(&list);
+			int pos = indexOf(&list, cur);
+			shiftRightPiece(&list, pos, pos + *((int*)curWait->ctx), curWait->timer);
+			timeout_was_set = 0;
 		}
 
 		
