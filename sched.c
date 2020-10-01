@@ -1,18 +1,11 @@
 #include "sched.h"
 #include <stdlib.h>
+#include "mylist.h"
 
 #define POOL_SIZE 16
 #define PRIOR_RANGE_MAX 11
 #define READY_TO_EXECUTE 0
 
-struct task {
-	void (*entry)(void *ctx);
-	void *ctx;
-	int priority;
-	int deadline;
-	int index;
-	int timer;
-};
 
 int fifo_cmp(struct task *t1, struct task *t2);
 int prior_cmp(struct task *t1, struct task *t2);
@@ -23,13 +16,14 @@ int can_be_entried(int i);
 int any_task_can_be_entried(int start_closed, int end_unclosed);
 
 
-
 static int (*policy_cmp)(struct task *t1, struct task *t2);
 static struct task taskpool[POOL_SIZE];
 static int taskpool_n;
 static enum policy policy;
 int prior_cnt[PRIOR_RANGE_MAX];
 int zero_deadline_cnt;
+int was_tick;
+struct List list;
 
 
 void sched_new(void (*entrypoint)(void *aspace),
@@ -71,6 +65,7 @@ void sched_time_elapsed(unsigned amount) {
 			taskpool[i].timer--;
 		}
 	}
+	was_tick++;
 }
 
 void sched_set_policy(enum policy _policy) {
@@ -154,28 +149,12 @@ void exec_deadline() {
 
 void sched_run(void) {
 	qsort(taskpool, taskpool_n, sizeof(struct task), policy_cmp);
-
-	switch (policy){
-		case POLICY_FIFO:
-			while (any_task_can_be_entried(0, taskpool_n)) {
-				for (int i = 0; i < taskpool_n; i++) {
-					if (taskpool[i].timer == READY_TO_EXECUTE && can_be_entried(i)) {
-						taskpool[i].entry(taskpool[i].ctx);
-					}
-				}
-			}
-			break;
-		
-		case POLICY_PRIO:
-			exec_prio();
-			break;
-
-		case POLICY_DEADLINE:
-			exec_deadline();
-			break;
-		default:
-			break;
+	list = createList();
+	for (int i = 0; i < taskpool_n; i++) {
+		push(&list, &taskpool[i]);
 	}
+	printList(&list);
+	
 	
 }
 
