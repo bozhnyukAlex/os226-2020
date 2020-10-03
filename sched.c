@@ -25,6 +25,8 @@ int zero_deadline_cnt;
 int timeout_was_set;
 struct List list;
 struct task *curWait;
+int global_time;
+struct List queue;
 
 
 void sched_new(void (*entrypoint)(void *aspace),
@@ -37,13 +39,12 @@ void sched_new(void (*entrypoint)(void *aspace),
 	t->entry = entrypoint;
 	t->ctx = aspace;
 	t->priority = priority;
-	t->timer = READY_TO_EXECUTE;
+	t->ready_time = global_time;
 	if (deadline <= 0) {
 		deadline = 0;
 		zero_deadline_cnt++;
 	}
 	t->deadline = deadline;
-	t->counter = *((int*)t->ctx);
 	prior_cnt[priority]++;
 	
 	
@@ -52,25 +53,16 @@ void sched_new(void (*entrypoint)(void *aspace),
 void sched_cont(void (*entrypoint)(void *aspace),
 		void *aspace,
 		int timeout) {
-	if (timeout > 0) {
-		timeout_was_set++;
-	}
-	for (int i = 0; i < taskpool_n; i++) {
-		if (taskpool[i].ctx == aspace) {
-			taskpool[i].timer = timeout;
-			curWait = &taskpool[i];
-		}
-	}
+
+		
+	
 }
 
 
 
 void sched_time_elapsed(unsigned amount) {
-	for (int i = 0; i < taskpool_n; i++) {
-		if (taskpool[i].timer != READY_TO_EXECUTE) {
-			taskpool[i].timer--;
-		}
-	}
+	global_time += amount;
+
 }
 
 void sched_set_policy(enum policy _policy) {
@@ -92,91 +84,14 @@ void sched_set_policy(enum policy _policy) {
 	}
 }
 
-void round_robin_push(int start_closed, int end_unclosed) {
-	while (any_count_more_zero(start_closed, end_unclosed)) {
-		for (int i = start_closed; i < end_unclosed; i++) {
-			if (taskpool[i].counter >= 0) {
-				push(&list, &taskpool[i]);
-				taskpool[i].counter--;
-			}
-		}
-	}
-}
-
-void priority_push(int start_closed, int end_unclosed) {
-	for (int i = start_closed; i < end_unclosed; i++) {
-		int cur_priority = taskpool[i].priority;
-		int cur_task_prior_cnt = prior_cnt[cur_priority];
-		if (cur_task_prior_cnt == 1) {
-			while (taskpool[i].counter >= 0) {
-				push(&list, &taskpool[i]);
-				taskpool[i].counter--;
-			}
-		}
-		else if (cur_task_prior_cnt > 1) {
-			round_robin_push(i, i + cur_task_prior_cnt);
-			i += (cur_task_prior_cnt - 1);
-		}
-	}
-
-}
-
-
 
 void sched_run(void) {
 	qsort(taskpool, taskpool_n, sizeof(struct task), policy_cmp);
-	list = createList();
-
-	switch (policy) {
-		case POLICY_FIFO: {
-			round_robin_push(0, taskpool_n);
-			break;
-		}
-		case POLICY_PRIO: {
-			priority_push(0, taskpool_n);
-			break;
-		}
-		case POLICY_DEADLINE: {
-			for (int i = zero_deadline_cnt; i < taskpool_n; i++) {
-				int dead_cnt = 0, 
-					j = i;
-				int cur_deadline = taskpool[i].deadline;
-				while (taskpool[j].deadline == cur_deadline) {
-					dead_cnt++;
-					j++;
-				}
-				if (dead_cnt == 1) {
-					while (taskpool[i].counter >= 0) {
-						push(&list, &taskpool[i]);
-						taskpool[i].counter--;
-					}
-				}
-				else if (dead_cnt > 1) {
-					priority_push(i, i + dead_cnt);
-					i += (dead_cnt - 1);
-				}
-			}
-			priority_push(0, zero_deadline_cnt);
-
-		}
+	queue = createList();
+	for (int i = 0; i < taskpool_n; i++) {
+		push(&queue, &taskpool[i]);
 	}
-
-
-	while (list.head) {
-		list.head->data->entry(list.head->data->ctx);
-		deleteHead(&list);
-		struct Node* cur = list.head;
-		if (timeout_was_set) {
-			while (cur && cur->data != curWait) {
-				cur = cur->next;
-			}
-			int pos = indexOf(&list, cur);
-			shiftRightPiece(&list, pos, pos + *((int*)curWait->ctx), curWait->timer);
-			timeout_was_set = 0;
-		}
-
-		
-	}
+	
 	
 }
 
@@ -214,11 +129,12 @@ int deadline_cmp(struct task *t1, struct task *t2) {
 	return prior_cmp(t1, t2);
 }
 
-
+//deprecated
 int can_be_entried(int i) {
 	return *((int*)taskpool[i].ctx) >= 0; // access to ctx->cnt
 }
 
+//deprecated
 int any_count_more_zero(int start_closed, int end_unclosed) {
 	for(int i = start_closed; i < end_unclosed; i++) {
 		if (taskpool[i].counter >= 0) {
@@ -228,6 +144,7 @@ int any_count_more_zero(int start_closed, int end_unclosed) {
 	return 0;
 }
 
+//deprecated
 int any_task_can_be_entried(int start_closed, int end_unclosed) {
 	for (int i = start_closed; i < end_unclosed; i++) {
 		if (can_be_entried(i)) { 

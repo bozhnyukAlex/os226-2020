@@ -6,8 +6,7 @@ struct task {
 	int priority;
 	int deadline;
 	int index;
-	int timer;
-	int counter;
+	int ready_time; 
 };
 
 enum policy {
