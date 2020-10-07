@@ -1,14 +1,5 @@
 #pragma once
 
-struct task {
-	void (*entry)(void *ctx);
-	void *ctx;
-	int priority;
-	int deadline;
-	int index;
-	int ready_time; 
-};
-
 enum policy {
 	// first-in, first-out; run tasks in order of their arrival
 	POLICY_FIFO,

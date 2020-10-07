@@ -11,7 +11,7 @@ struct List createList() {
     return list;
 }
 
-struct Node* createNode(struct task* value) {
+struct Node* createNode(void* value) {
     struct Node* node = (struct Node*) malloc(sizeof(struct Node));
     if (node == NULL) {
         printf("ERROR");
@@ -41,7 +41,7 @@ void insertToBegin(struct List* list, struct Node* node) {
         list->end = node; ///if not, list->end already exists
     }
 }
-void insertAfterEl(struct List* list, size_t afterNum, struct task* newValue) {
+void insertAfterEl(struct List* list, size_t afterNum, void* newValue) {
     struct Node* after = getN(list, afterNum);
     struct Node* newNode = createNode(newValue);
     newNode->next = after->next;
@@ -52,7 +52,7 @@ void insertAfterEl(struct List* list, size_t afterNum, struct task* newValue) {
     }
 }
 
-void push(struct List* list, struct task* newValue) {
+void push(struct List* list, void* newValue) {
     if (list->length == 0) {
         list->head = createNode(newValue);
         list->head->next = NULL;
@@ -87,7 +87,7 @@ void deleteNode(struct List* list, size_t numDelete) {
     }
 }
 
-void deleteNodeByValue(struct List* list, struct task* value) {
+void deleteNodeByValue(struct List* list, void* value) {
     struct Node* curr = list->head;
     if (list->length == 1) {
         list->head = curr->next;
@@ -201,7 +201,7 @@ void shiftRightPiece(struct List *list, int pos1, int pos2, int shift) {
 
 
 }
-
+/*
 void printList(struct List *list) {
     if (list->length == 0) {
         printf("List is empty\n");
@@ -214,7 +214,7 @@ void printList(struct List *list) {
         index++;
         curr = curr->next;
     }
-}
+}*/
 
 
 

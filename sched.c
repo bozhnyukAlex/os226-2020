@@ -4,8 +4,16 @@
 
 #define POOL_SIZE 16
 #define PRIOR_RANGE_MAX 11
-#define READY_TO_EXECUTE 0
-#define TRUE 1
+
+struct task {
+	void (*entry)(void *ctx);
+	void *ctx;
+	int priority;
+	int deadline;
+	int index;
+	int ready_time; 
+};
+
 
 
 int fifo_cmp(struct task *t1, struct task *t2);
@@ -13,9 +21,6 @@ int prior_cmp(struct task *t1, struct task *t2);
 int index_cmp(struct task *t1, struct task *t2);
 int deadline_cmp(struct task *t1, struct task *t2);
 void policy_push(struct task *value);
-
-int can_be_entried(int i);
-int any_task_can_be_entried(int start_closed, int end_unclosed);
 
 
 static int (*policy_cmp)(struct task *t1, struct task *t2);
@@ -70,7 +75,7 @@ void sched_time_elapsed(unsigned amount) {
 	global_time += amount;
 	struct Node *curr_w = wait_queue.head;
 	while (curr_w) { // анализируем wait_queue
-		if (curr_w->data->ready_time <= global_time) {
+		if (((struct task*)curr_w->data)->ready_time <= global_time) {
 			policy_push(curr_w->data);
 			struct Node* temp = curr_w;
 			curr_w = curr_w->next;
@@ -99,7 +104,7 @@ void sched_set_policy(enum policy _policy) {
 			abort();
 			break;
 	}
-}
+}	
 
 
 
@@ -119,7 +124,7 @@ void sched_run(void) {
 
 	struct Node* curr = run_queue.head;
 	while (curr) {
-		curr->data->entry(curr->data->ctx);
+		((struct task*) curr->data)->entry(((struct task*) curr->data)->ctx);
 		deleteHead(&run_queue);
 		curr = run_queue.head;
 	}
@@ -139,17 +144,17 @@ void policy_push(struct task *value) {
 			else if (val_prior_cnt > 1) { // вставляем в конец round-robin-отрезка
 				struct Node* curr = run_queue.head;
 				
-				if (run_queue.end->data->priority == value->priority) {
+				if (((struct task*)run_queue.end->data)->priority == value->priority) {
 					push(&run_queue, value);
 				}
 				else {
-					while (value->priority != curr->data->priority && curr) {
+					while (value->priority != ((struct task*)curr->data)->priority && curr) {
 						curr = curr->next;
 					}
 					struct Node* before_end;
 					struct Node* to_push = createNode(value);
-					while (value->priority == curr->data->priority && curr) {
-						if (curr->next->data->priority != value->priority) {
+					while (value->priority == ((struct task*)curr->data)->priority && curr) {
+						if (((struct task*)curr->next)->priority != value->priority) {
 							before_end = curr;
 						}
 						curr = curr->next;
@@ -175,7 +180,7 @@ void policy_push(struct task *value) {
 			else if (this_deadline_count > 1) { // вот тут по приоритетам...
 				int val_prior_cnt = prior_cnt[value->priority];
 				struct Node* curr = run_queue.head;
-				while (curr->data->deadline != val_deadline && curr) {// ищем, откуда в списке начинается отрезок с нашим дедлайном
+			    while (((struct task*)curr->data)->deadline != val_deadline && curr) { // ищем, откуда в списке начинается отрезок с нашим дедлайном
 					curr = curr->next;
 				}
 				// Теперь curr на начале отрезка с нашим дедлайном.
@@ -198,17 +203,17 @@ void policy_push(struct task *value) {
 					}
 				}
 				else if (dead_prior_cnt > 1) { // тут round-robin, curr на начале отрезка с дедлайном
-					if (run_queue.end->data->priority == value->priority) { // если конец отрезка совпал с концом списка - просто вставка
+				    if (((struct task*)run_queue.end->data)->priority == value->priority) { // если конец отрезка совпал с концом списка - просто вставка
 						push(&run_queue, value);
 					}
 					else {
-						while (value->priority != curr->data->priority && curr) { // ищем начало отрезка с приоритетом
+						while (value->priority != ((struct task*)curr->data)->priority && curr) { // ищем начало отрезка с приоритетом
 							curr = curr->next;
 						}
 						struct Node* before_end;
 						struct Node* to_push = createNode(value);
-						while (value->priority == curr->data->priority && curr) { //ищем конец отрезка с приоритетом и пред-конец
-							if (curr->next->data->priority != value->priority) {
+						while (value->priority == ((struct task*)curr->data)->priority && curr) { //ищем конец отрезка с приоритетом и пред-конец
+							if (((struct task*)curr->next->data)->priority != value->priority) {
 								before_end = curr;
 							}
 							curr = curr->next;
