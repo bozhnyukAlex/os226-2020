@@ -87,6 +87,29 @@ void deleteNode(struct List* list, size_t numDelete) {
     }
 }
 
+void deleteNodeByValue(struct List* list, struct task* value) {
+    struct Node* curr = list->head;
+    if (list->length == 1) {
+        list->head = curr->next;
+        list->end = list->head;
+        list->length = 0;
+        free(curr);
+        return;
+    }
+    while (curr) {
+        if(curr->next->data == value) {
+            free(curr->next);
+            curr->next = curr->next->next;
+            list->length--;
+            if (list->length == 1) {
+                list->end = list->head;
+            }
+            return;
+        }
+        curr = curr->next;
+    }
+}
+
 void deleteHead(struct List* list) {
     if (list->length == 0) {
         return;
@@ -94,6 +117,9 @@ void deleteHead(struct List* list) {
     struct Node* toDelete = list->head;
     list->head = toDelete->next;
     list->length--;
+    if (list->length == 1) {
+        list->end = list->head;
+    }
     free(toDelete);
 }
 
@@ -177,6 +203,10 @@ void shiftRightPiece(struct List *list, int pos1, int pos2, int shift) {
 }
 
 void printList(struct List *list) {
+    if (list->length == 0) {
+        printf("List is empty\n");
+        return;
+    }
     struct Node* curr = list->head;
     int index = 0;
     while (curr) {

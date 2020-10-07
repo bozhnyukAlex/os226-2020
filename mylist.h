@@ -27,6 +27,6 @@ void reverseList(struct List* list);
 void printList(struct List *list);
 int indexOf(struct List *list, struct Node *toFind);
 void shiftRightPiece(struct List *list, int pos1, int pos2, int shift);
-
+void deleteNodeByValue(struct List* list, struct task* value);
 
 #endif // MYLIST_H_INCLUDED

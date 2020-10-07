@@ -5,12 +5,14 @@
 #define POOL_SIZE 16
 #define PRIOR_RANGE_MAX 11
 #define READY_TO_EXECUTE 0
+#define TRUE 1
 
 
 int fifo_cmp(struct task *t1, struct task *t2);
 int prior_cmp(struct task *t1, struct task *t2);
 int index_cmp(struct task *t1, struct task *t2);
 int deadline_cmp(struct task *t1, struct task *t2);
+void policy_push(struct task *value);
 
 int can_be_entried(int i);
 int any_task_can_be_entried(int start_closed, int end_unclosed);
@@ -23,11 +25,9 @@ static enum policy policy;
 int prior_cnt[PRIOR_RANGE_MAX];
 int zero_deadline_cnt;
 int timeout_was_set;
-struct List list;
-struct task *curWait;
 int global_time;
-struct List queue;
-
+struct List run_queue;
+struct List wait_queue;
 
 void sched_new(void (*entrypoint)(void *aspace),
 		void *aspace,
@@ -46,23 +46,40 @@ void sched_new(void (*entrypoint)(void *aspace),
 	}
 	t->deadline = deadline;
 	prior_cnt[priority]++;
-	
-	
 }
 
 void sched_cont(void (*entrypoint)(void *aspace),
-		void *aspace,
-		int timeout) {
-
-		
-	
+	void *aspace,
+	int timeout) {
+	for (int i = 0; i < taskpool_n; i++) {
+		if (aspace == taskpool[i].ctx) {
+			taskpool[i].ready_time = global_time + timeout;
+			if (timeout == 0) {
+				policy_push(&taskpool[i]);
+			}
+			else if (timeout > 0) {
+				push(&wait_queue, &taskpool[i]);
+			}
+		}
+	}
 }
 
 
 
 void sched_time_elapsed(unsigned amount) {
 	global_time += amount;
-
+	struct Node *curr_w = wait_queue.head;
+	while (curr_w) { // анализируем wait_queue
+		if (curr_w->data->ready_time <= global_time) {
+			policy_push(curr_w->data);
+			struct Node* temp = curr_w;
+			curr_w = curr_w->next;
+			deleteNodeByValue(&wait_queue, temp->data);
+		}
+		else {
+			curr_w = curr_w->next;
+		}
+	}
 }
 
 void sched_set_policy(enum policy _policy) {
@@ -85,23 +102,125 @@ void sched_set_policy(enum policy _policy) {
 }
 
 
+
+
 void sched_run(void) {
 	qsort(taskpool, taskpool_n, sizeof(struct task), policy_cmp);
-	queue = createList();
+	run_queue = createList();
 	for (int i = 0; i < taskpool_n; i++) {
-		push(&queue, &taskpool[i]);
+		push(&run_queue, &taskpool[i]);
 	}
-	
-	
+	if (policy == POLICY_DEADLINE) {
+		for (int i = 0; i < zero_deadline_cnt; i++) {
+			push(&run_queue, run_queue.head->data);
+			deleteHead(&run_queue);
+		}
+	}
+
+	struct Node* curr = run_queue.head;
+	while (curr) {
+		curr->data->entry(curr->data->ctx);
+		deleteHead(&run_queue);
+		curr = run_queue.head;
+	}
 }
 
+void policy_push(struct task *value) {
+	switch (policy) {
+		case POLICY_FIFO: {
+			push(&run_queue, value);
+			break;
+		}
+		case POLICY_PRIO: {
+			int val_prior_cnt = prior_cnt[value->priority];
+			if (val_prior_cnt == 1) { // вставляем в начало
+				insertToBegin(&run_queue, createNode(value));
+			}
+			else if (val_prior_cnt > 1) { // вставляем в конец round-robin-отрезка
+				struct Node* curr = run_queue.head;
+				
+				if (run_queue.end->data->priority == value->priority) {
+					push(&run_queue, value);
+				}
+				else {
+					while (value->priority != curr->data->priority && curr) {
+						curr = curr->next;
+					}
+					struct Node* before_end;
+					struct Node* to_push = createNode(value);
+					while (value->priority == curr->data->priority && curr) {
+						if (curr->next->data->priority != value->priority) {
+							before_end = curr;
+						}
+						curr = curr->next;
+					}
+					before_end->next = to_push;
+					to_push->next = curr;
+				}
 
-
-
-
-
-
-
+			}
+			break;
+		}
+		case POLICY_DEADLINE: {
+			int val_deadline = value->deadline;
+			int this_deadline_count = 0;
+			for (int i = 0; i < taskpool_n; i++) {
+				if (taskpool[i].deadline == val_deadline) {
+					this_deadline_count++;
+				}
+			}
+			if (this_deadline_count == 1) { // вставим в начало
+				insertToBegin(&run_queue, createNode(value));
+			}
+			else if (this_deadline_count > 1) { // вот тут по приоритетам...
+				int val_prior_cnt = prior_cnt[value->priority];
+				struct Node* curr = run_queue.head;
+				while (curr->data->deadline != val_deadline && curr) {// ищем, откуда в списке начинается отрезок с нашим дедлайном
+					curr = curr->next;
+				}
+				// Теперь curr на начале отрезка с нашим дедлайном.
+				int dead_prior_cnt = 0;
+				for (int i = 0; i < taskpool_n; i++) {
+					if (taskpool[i].deadline == val_deadline && taskpool[i].priority == value->priority) {
+						dead_prior_cnt++;
+					}
+				}
+				if (dead_prior_cnt == 1) { // как в приоритетах - один такой - вставили в начало
+					if (curr == run_queue.head) {
+						insertToBegin(&run_queue, createNode(value));
+					}
+					else {
+						struct Node* prev_curr = run_queue.head;
+						while (prev_curr->next != curr) {
+							prev_curr = prev_curr->next;
+						}
+						insertAfterEl(&run_queue, indexOf(&run_queue, prev_curr), value);
+					}
+				}
+				else if (dead_prior_cnt > 1) { // тут round-robin, curr на начале отрезка с дедлайном
+					if (run_queue.end->data->priority == value->priority) { // если конец отрезка совпал с концом списка - просто вставка
+						push(&run_queue, value);
+					}
+					else {
+						while (value->priority != curr->data->priority && curr) { // ищем начало отрезка с приоритетом
+							curr = curr->next;
+						}
+						struct Node* before_end;
+						struct Node* to_push = createNode(value);
+						while (value->priority == curr->data->priority && curr) { //ищем конец отрезка с приоритетом и пред-конец
+							if (curr->next->data->priority != value->priority) {
+								before_end = curr;
+							}
+							curr = curr->next;
+						}
+						before_end->next = to_push;
+						to_push->next = curr;
+					}
+				}
+			}
+		}
+	}
+}
 
 
 
@@ -127,29 +246,4 @@ int deadline_cmp(struct task *t1, struct task *t2) {
 		return delta;
 	}
 	return prior_cmp(t1, t2);
-}
-
-//deprecated
-int can_be_entried(int i) {
-	return *((int*)taskpool[i].ctx) >= 0; // access to ctx->cnt
-}
-
-//deprecated
-int any_count_more_zero(int start_closed, int end_unclosed) {
-	for(int i = start_closed; i < end_unclosed; i++) {
-		if (taskpool[i].counter >= 0) {
-			return 1;
-		}
-	}
-	return 0;
-}
-
-//deprecated
-int any_task_can_be_entried(int start_closed, int end_unclosed) {
-	for (int i = start_closed; i < end_unclosed; i++) {
-		if (can_be_entried(i)) { 
-			return 1;
-		}
-	}
-	return 0;
 }
