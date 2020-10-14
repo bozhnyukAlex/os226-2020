@@ -70,7 +70,7 @@ static void policy_run(struct task *t) {
 	*c = t;
 }
 
-static void hctx_push(greg_t *regs, unsigned long val) {
+static void hctx_push(greg_t *regs, unsigned long val) { // положить значение на стек
 	regs[REG_RSP] -= sizeof(unsigned long);
 	*(unsigned long *) regs[REG_RSP] = val;
 }
@@ -86,7 +86,7 @@ static void top(int sig, siginfo_t *info, void *ctx) {
 	hctx_push(regs, regs[REG_RBP]);
 	hctx_push(regs, oldsp);
 	hctx_push(regs, (unsigned long) bottom);
-	regs[REG_RIP] = (greg_t) tramptramp;
+	regs[REG_RIP] = (greg_t) tramptramp; 
 }
 
 int sched_gettime(void) {
@@ -95,9 +95,7 @@ int sched_gettime(void) {
 	int cnt2 = timer_cnt();
 	int time2 = time;
 
-	return (cnt1 <= cnt2) ?
-		time1 + cnt2 :
-		time2 + cnt2;
+	return (cnt1 <= cnt2) ? time1 + cnt2 : time2 + cnt2;
 }
 
 // FIXME below this line
@@ -131,7 +129,7 @@ void sched_sleep(unsigned ms) {
 
 void sched_run(int period_ms) {
 	sigemptyset(&irqs);
-	sigaddset(&irqs, SIGALRM);
+	sigaddset(&irqs, SIGALRM);// сигнал того, что кончился таймер добавлен
 
 	tick_period = period_ms;
 	timer_init_period(period_ms, top);

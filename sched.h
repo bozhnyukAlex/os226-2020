@@ -27,7 +27,7 @@ extern void sched_cont(void (*entrypoint)(void *aspace), // entrypoint function
 		void *aspace,// addresses the process can access
 		int timeout); // when the continuation became runnable
 
-// Notify scheduler that some amount of time passed
+
 extern void sched_sleep(unsigned amount);
 
 extern int sched_gettime(void);

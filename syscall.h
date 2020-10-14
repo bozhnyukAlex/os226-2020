@@ -1,7 +1,7 @@
 #pragma once
 
 #define SYSCALL_X(x) \
-	x(print, int, 2, char*, argv, int, len) \    
+	x(print, int, 2, char*, argv, int, len) \
 
 #define SC_NR(name, ...) os_syscall_nr_ ## name,
 enum syscalls_num {
@@ -29,7 +29,7 @@ static inline long os_syscall(int syscall,
 }
 
 #define DEFINE0(ret, name) \
-	static inline ret os_ ## name (void) { \    
+	static inline ret os_ ## name (void) { \
 		return (ret) os_syscall(os_syscall_nr_ ## name, 0, 0, 0, 0, (void *) 0); \
 	}
 #define DEFINE1(ret, name, type1, name1) \

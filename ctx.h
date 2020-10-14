@@ -13,5 +13,5 @@ struct ctx {
 
 extern void ctx_make(struct ctx *ctx, void *entry, void *stack, int stacksz);
 
-extern void ctx_switch(struct ctx *old, struct ctx *new);
+extern void ctx_switch(struct ctx *old, struct ctx *new); // rdi == old, rsi == new, перенос всех регистров из old в new
 

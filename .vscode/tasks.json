@@ -1,26 +1,21 @@
 {
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
     "tasks": [
         {
+            "label": "make",
             "type": "shell",
-            "label": "C/C++: gcc-9 build active file",
-            "command": "/usr/bin/gcc-9",
+            "command": "make",
             "args": [
-                "-g",
-                "${file}",
-                "-o",
-                "${fileDirname}/${fileBasenameNoExtension}"
+                "-f",
+                "Makefile"
             ],
-            "options": {
-                "cwd": "${workspaceFolder}"
-            },
-            "problemMatcher": [
-                "$gcc"
-            ],
+            "problemMatcher": [],
             "group": {
                 "kind": "build",
                 "isDefault": true
             }
         }
-    ],
-    "version": "2.0.0"
-}
+    ]
+}   
