@@ -114,7 +114,6 @@ static void tasktramp(void) {
 	current->entry(current->as);
 }
 
-
 static struct task* updateTask() {
 	struct task *pr = current;
 	current = runq;
@@ -161,9 +160,7 @@ static void bottom(void) {
 	if (sched_gettime() - current_start >= tick_period) { // когда квант времени текущей задачи кончился - вытесняем задачу
 		policy_run(current);
 
-		struct task *pr = current;
-		current = runq;
-		runq = runq->next;
+		struct task *pr = updateTask();
 		switch_ctx(pr, current);
 
 	}
@@ -186,13 +183,7 @@ void sched_sleep(unsigned ms) {
 	current->waketime = sched_gettime() + ms;
 
 	irq_disable();
-	struct task **c = &waitq;
-	while (*c && (*c)->waketime < current->waketime) {
-		c = &(*c)->next;
-	}
-	current->next = *c;
-	*c = current;
-
+	wait_push(current);
 	struct task *pr = updateTask();
 	switch_ctx(pr, current);
 	irq_enable();

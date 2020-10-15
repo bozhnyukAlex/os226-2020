@@ -102,7 +102,7 @@ struct app_ctx app_ctxs[16];
 
 static void print(struct app_ctx *ctx, const char *msg) {
         printf("app1 id %d %s time %d reference %ld\n", 
-		ctx - app_ctxs, msg, sched_gettime(), reftime() - refstart);
+		ctx - app_ctxs, msg, sched_gettime(), reftime() - refstart) ;
 	fflush(stdout);
 }
 
