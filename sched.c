@@ -99,8 +99,10 @@ int sched_gettime(void) {
 }
 
 // FIXME below this line
-
+// включает текущую задачу
 static void tasktramp(void) {
+	irq_enable(); // во время работы задачи надо реагировать на таймер
+	current->entry(current->as);
 }
 
 void sched_new(void (*entrypoint)(void *aspace),
@@ -140,6 +142,5 @@ void sched_run(int period_ms) {
 	irq_disable();
 
 	current = &idle;
-
-	sigsuspend(&none);
+	
 }
