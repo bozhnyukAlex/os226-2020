@@ -127,14 +127,21 @@ void sched_new(void (*entrypoint)(void *aspace),
 	t->priority = priority;
 
 	ctx_make(&t->ctx, tasktramp, t->stack, sizeof(t->stack));
+
+	irq_disable(); // при работе с очередью нельзя давать прерываниям таймера мешать
+	policy_run(t);
+	irq_enable();
 }
 
 static void bottom(void) {
 	time += tick_period;
+
+	
 }
 
 void sched_sleep(unsigned ms) {
 }
+
 
 void sched_run(int period_ms) {
 	sigemptyset(&irqs);
