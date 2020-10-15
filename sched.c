@@ -105,6 +105,13 @@ static void tasktramp(void) {
 	current->entry(current->as);
 }
 
+
+
+static void switch_ctx(struct task *old, struct task *new) {
+	current_start = sched_gettime();
+	ctx_switch(&old->ctx, &new->ctx);
+}
+
 void sched_new(void (*entrypoint)(void *aspace),
 		void *aspace,
 		int priority) {
@@ -142,5 +149,20 @@ void sched_run(int period_ms) {
 	irq_disable();
 
 	current = &idle;
+	while (runq || waitq) {
+		if (runq) {
+			policy_run(current);
+
+			struct task *pr = current;
+			current = runq;
+			runq = runq->next;
+			switch_ctx(pr, current);
+		}
+		else { // если остались только ожидающие, то ждем таймер, чтобы отправить в обработчике ожидающих на исполнение
+			sigsuspend(&none);
+		}
+	}
+
+	irq_enable();
 	
 }
