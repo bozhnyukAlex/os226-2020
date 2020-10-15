@@ -15,8 +15,8 @@ struct timeval init_value;
 int timer_cnt(void) {
 	struct itimerval *curr;
 	getitimer(ITIMER_REAL, curr);
-	int time_el_div = 1000 * (init_value.tv_sec - curr->it_value.tv_sec);
-	int time_el_mod = (init_value.tv_usec - curr->it_value.tv_usec) / 1000;
+	__time_t time_el_div = 1000 * (init_value.tv_sec - curr->it_value.tv_sec);
+	suseconds_t time_el_mod = (init_value.tv_usec - curr->it_value.tv_usec) / 1000;
 	return time_el_div + time_el_mod;
 }
 
