@@ -136,6 +136,7 @@ void sched_new(void (*entrypoint)(void *aspace),
 
 static void bottom(void) {
 	time += tick_period;
+	irq_disable();
 
 	while (waitq != NULL && waitq->waketime <= sched_gettime()) {
 		struct task *temp = waitq;
@@ -144,16 +145,16 @@ static void bottom(void) {
 	} 
 
 	if (sched_gettime() - current_start >= tick_period) { // когда квант времени текущей задачи кончился - вытесняем задачу
-		irq_disable();
 		policy_run(current);
 
 		struct task *pr = current;
 		current = runq;
 		runq = runq->next;
 		switch_ctx(pr, current);
-		irq_enable();
 
 	}
+
+	irq_enable();
 
 	
 }
@@ -175,8 +176,8 @@ void sched_run(int period_ms) {
 	irq_disable();
 
 	current = &idle;
-	while (runq || waitq) {
-		if (runq) {
+	while (runq != NULL || waitq != NULL) {
+		if (runq != NULL) {
 			policy_run(current);
 
 			struct task *pr = current;

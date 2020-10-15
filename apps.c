@@ -33,6 +33,8 @@ static const struct app {
 #undef ELEM
 };
 
+static long refstart;
+
 static int exec(int argc, char *argv[]) {
 	const struct app *app = NULL;
 	for (int i = 0; i < ARRAY_SIZE(app_list); ++i) {
@@ -99,10 +101,6 @@ struct app_ctx {
 struct app_ctx app_ctxs[16];
 
 static void print(struct app_ctx *ctx, const char *msg) {
-	static long refstart;
-	if (!refstart) {
-		refstart = reftime();
-	}
         printf("app1 id %d %s time %d reference %ld\n", 
 		ctx - app_ctxs, msg, sched_gettime(), reftime() - refstart);
 	fflush(stdout);
@@ -179,5 +177,8 @@ static void shell(void *ctx) {
 }
 
 void init(void) {
+	if (!refstart) {
+		refstart = reftime();
+	}
 	sched_new(shell, NULL, 0);
 }
