@@ -70,6 +70,15 @@ static void policy_run(struct task *t) {
 	*c = t;
 }
 
+static void wait_push(struct task *t) {
+	struct task **c = &waitq;
+	while (*c && (*c)->waketime < t->waketime) {
+		c = &(*c)->next;
+	}
+	t->next = *c;
+	*c = t;
+}
+
 static void hctx_push(greg_t *regs, unsigned long val) { // положить значение на стек
 	regs[REG_RSP] -= sizeof(unsigned long);
 	*(unsigned long *) regs[REG_RSP] = val;
@@ -160,12 +169,38 @@ static void bottom(void) {
 }
 
 void sched_sleep(unsigned ms) {
+	if (ms == 0) { // как sched_cont(0), просто вставка в очередь
+		irq_disable();
+		policy_run(current);
+		struct task *pr = current;
+		current = runq;
+		runq = runq->next;
+		switch_ctx(pr, current);
+		irq_enable();
+		return;
+	}
+
+	current->waketime = sched_gettime() + ms;
+
+	irq_disable();
+	struct task **c = &waitq;
+	while (*c && (*c)->waketime < current->waketime) {
+		c = &(*c)->next;
+	}
+	current->next = *c;
+	*c = current;
+
+	struct task *pr = current;
+	current = runq;
+	runq = runq->next;
+	switch_ctx(pr, current);
+	irq_enable();
 }
 
 
 void sched_run(int period_ms) {
 	sigemptyset(&irqs);
-	sigaddset(&irqs, SIGALRM);// сигнал того, что кончился таймер добавлен
+	sigaddset(&irqs, SIGALRM);// сигнал того, что кончился таймер, добавлен
 
 	tick_period = period_ms;
 	timer_init_period(period_ms, top);
