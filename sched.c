@@ -115,7 +115,12 @@ static void tasktramp(void) {
 }
 
 
-
+static struct task* updateTask() {
+	struct task *pr = current;
+	current = runq;
+	runq = runq->next;
+	return pr;
+}
 static void switch_ctx(struct task *old, struct task *new) {
 	current_start = sched_gettime();
 	ctx_switch(&old->ctx, &new->ctx);
@@ -172,9 +177,7 @@ void sched_sleep(unsigned ms) {
 	if (ms == 0) { // как sched_cont(0), просто вставка в очередь
 		irq_disable();
 		policy_run(current);
-		struct task *pr = current;
-		current = runq;
-		runq = runq->next;
+		struct task *pr = updateTask();
 		switch_ctx(pr, current);
 		irq_enable();
 		return;
@@ -190,9 +193,7 @@ void sched_sleep(unsigned ms) {
 	current->next = *c;
 	*c = current;
 
-	struct task *pr = current;
-	current = runq;
-	runq = runq->next;
+	struct task *pr = updateTask();
 	switch_ctx(pr, current);
 	irq_enable();
 }
@@ -215,9 +216,7 @@ void sched_run(int period_ms) {
 		if (runq != NULL) {
 			policy_run(current);
 
-			struct task *pr = current;
-			current = runq;
-			runq = runq->next;
+			struct task *pr = updateTask();
 			switch_ctx(pr, current);
 		}
 		else { // если остались только ожидающие, то ждем таймер, чтобы отправить в обработчике ожидающих на исполнение
