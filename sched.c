@@ -133,8 +133,27 @@ void sched_new(void (*entrypoint)(void *aspace),
 	irq_enable();
 }
 
+
 static void bottom(void) {
 	time += tick_period;
+
+	while (waitq != NULL && waitq->waketime <= sched_gettime()) {
+		struct task *temp = waitq;
+		policy_run(temp);
+		waitq = waitq->next;
+	} 
+
+	if (sched_gettime() - current_start >= tick_period) { // когда квант времени текущей задачи кончился - вытесняем задачу
+		irq_disable();
+		policy_run(current);
+
+		struct task *pr = current;
+		current = runq;
+		runq = runq->next;
+		switch_ctx(pr, current);
+		irq_enable();
+
+	}
 
 	
 }
