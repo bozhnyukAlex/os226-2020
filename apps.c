@@ -174,6 +174,7 @@ static void shell(void *ctx) {
 			cmd = strtok_r(NULL, comsep, &stcmd);
 		}
 	}
+	//printf("QWEASZ\n");
 }
 
 void init(void) {

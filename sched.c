@@ -32,6 +32,7 @@ struct task {
 
 	// policy support
 	struct task *next;
+	int id;
 };
 
 static volatile int time;
@@ -107,12 +108,6 @@ int sched_gettime(void) {
 	return (cnt1 <= cnt2) ? time1 + cnt2 : time2 + cnt2;
 }
 
-// FIXME below this line
-// включает текущую задачу
-static void tasktramp(void) {
-	irq_enable(); // во время работы задачи надо реагировать на таймер
-	current->entry(current->as);
-}
 
 static struct task* updateTask() {
 	struct task *pr = current;
@@ -125,16 +120,28 @@ static void switch_ctx(struct task *old, struct task *new) {
 	ctx_switch(&old->ctx, &new->ctx);
 }
 
+// FIXME below this line
+// включает текущую задачу
+static void tasktramp(void) {
+	irq_enable(); // во время работы задачи надо реагировать на таймер
+	current->entry(current->as);
+	struct task *pr = updateTask();
+	switch_ctx(pr, current);
+}
+
+
 void sched_new(void (*entrypoint)(void *aspace),
 		void *aspace,
 		int priority) {
-
+	
 	if (ARRAY_SIZE(taskpool) <= taskpool_n) {
 		fprintf(stderr, "No mem for new task\n");
 		return;
 	}
-	struct task *t = &taskpool[taskpool_n++];
+	struct task *t = &taskpool[taskpool_n];
+	t->id = taskpool_n;
 
+	taskpool_n++;
 	t->entry = entrypoint;
 	t->as = aspace;
 	t->priority = priority;
@@ -148,8 +155,8 @@ void sched_new(void (*entrypoint)(void *aspace),
 
 
 static void bottom(void) {
-	time += tick_period;
 	irq_disable();
+	time += tick_period;
 
 	while (waitq != NULL && waitq->waketime <= sched_gettime()) {
 		struct task *temp = waitq;
@@ -158,10 +165,12 @@ static void bottom(void) {
 	} 
 
 	if (sched_gettime() - current_start >= tick_period) { // когда квант времени текущей задачи кончился - вытесняем задачу
+		debug(runq);
 		policy_run(current);
-
 		struct task *pr = updateTask();
 		switch_ctx(pr, current);
+	//	printf("@%d\nin bottom: ", sched_gettime());
+		
 
 	}
 
@@ -188,6 +197,15 @@ void sched_sleep(unsigned ms) {
 	switch_ctx(pr, current);
 	irq_enable();
 }
+void debug(struct task *t) {
+	return;
+	if (t == NULL) {
+		printf("NULL\n");
+		return;
+	}
+	printf("%d -> ", t->id);
+	debug(t->next);
+}
 
 
 void sched_run(int period_ms) {
@@ -201,20 +219,19 @@ void sched_run(int period_ms) {
 	sigemptyset(&none);
 
 	irq_disable();
+	idle.id = -2;
 
 	current = &idle;
 	while (runq != NULL || waitq != NULL) {
 		if (runq != NULL) {
 			policy_run(current);
-
 			struct task *pr = updateTask();
 			switch_ctx(pr, current);
+		//	printf("!!!!%d\nin run: ", sched_gettime());
+			debug(runq);
 		}
 		else { // если остались только ожидающие, то ждем таймер, чтобы отправить в обработчике ожидающих на исполнение
 			sigsuspend(&none);
 		}
 	}
-
-	irq_enable();
-	
 }
