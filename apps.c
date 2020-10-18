@@ -191,6 +191,8 @@ static int app_load(int argc, char* argv[]) {
 
 	int loaded_size = 0x1000;
 
+
+
 	void *loaded_app = mmap(NULL, loaded_size,
 			PROT_READ | PROT_WRITE | PROT_EXEC,
 			MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
@@ -198,10 +200,18 @@ static int app_load(int argc, char* argv[]) {
 		perror("mmap loaded_app");
 	}
 
-	Elf64_Ehdr *header = rawelf; // начало - главный заголовок
+	Elf64_Ehdr *header = &rawelf[0]; // начало - главный заголовок
+	Elf64_Phdr *ph_t = &rawelf[header->e_phoff]; // получили указатель на начало массива заголовков программы
+	Elf64_Half ph_n = header->e_phnum; // получили количество элементов массива
 	
+	for (Elf64_Phdr *curr = ph_t; curr < ph_t + ph_n; curr++) {
+		if (curr->p_type == PT_LOAD) {
+			memcpy(loaded_app, &rawelf[curr->p_offset], curr->p_filesz);
+		}
+	}
+	int (*app) (int, char*[]) = (int (*)(int, char*[])) header->e_entry;
 
-	
+	app(argc, argv);
 
 	if (0 != munmap(loaded_app, loaded_size)) {
 		perror("munmap");
