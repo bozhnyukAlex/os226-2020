@@ -13,9 +13,10 @@
 static struct timeval initv;
 
 int timer_cnt(void) {
-	struct itimerval curr;
-	getitimer(ITIMER_REAL, &curr); 
-	return (initv.tv_sec - curr.it_value.tv_sec) * 1000 + (initv.tv_usec - curr.it_value.tv_usec) / 1000;
+	struct itimerval it;
+	getitimer(ITIMER_REAL, &it);
+	return 1000 * (initv.tv_sec - it.it_value.tv_sec)
+		+ (initv.tv_usec - it.it_value.tv_usec) / 1000;
 }
 
 extern void timer_init_period(int ms, hnd_t hnd) {

@@ -70,16 +70,7 @@ static void policy_run(struct task *t) {
 	*c = t;
 }
 
-static void wait_push(struct task *t) {
-	struct task **c = &waitq;
-	while (*c && (*c)->waketime < t->waketime) {
-		c = &(*c)->next;
-	}
-	t->next = *c;
-	*c = t;
-}
-
-static void hctx_push(greg_t *regs, unsigned long val) { // положить значение на стек
+static void hctx_push(greg_t *regs, unsigned long val) {
 	regs[REG_RSP] -= sizeof(unsigned long);
 	*(unsigned long *) regs[REG_RSP] = val;
 }
@@ -95,7 +86,7 @@ static void top(int sig, siginfo_t *info, void *ctx) {
 	hctx_push(regs, regs[REG_RBP]);
 	hctx_push(regs, oldsp);
 	hctx_push(regs, (unsigned long) bottom);
-	regs[REG_RIP] = (greg_t) tramptramp; 
+	regs[REG_RIP] = (greg_t) tramptramp;
 }
 
 int sched_gettime(void) {
@@ -104,97 +95,97 @@ int sched_gettime(void) {
 	int cnt2 = timer_cnt();
 	int time2 = time;
 
-	return (cnt1 <= cnt2) ? time1 + cnt2 : time2 + cnt2;
+	return (cnt1 <= cnt2) ?
+		time1 + cnt2 :
+		time2 + cnt2;
 }
 
-
-static struct task* updateTask() {
-	struct task *pr = current;
+static void doswitch(void) {
+	struct task *old = current;
 	current = runq;
-	runq = runq->next;
-	return pr;
-}
-static void switch_ctx(struct task *old, struct task *new) {
+	runq = current->next;
+
 	current_start = sched_gettime();
-	ctx_switch(&old->ctx, &new->ctx);
+	ctx_switch(&old->ctx, &current->ctx);
 }
 
-// FIXME below this line
-// включает текущую задачу
 static void tasktramp(void) {
-	irq_enable(); // во время работы задачи надо реагировать на таймер
+	irq_enable();
 	current->entry(current->as);
-	struct task *pr = updateTask();
-	switch_ctx(pr, current);
+	irq_disable();
+	doswitch();
 }
-
 
 void sched_new(void (*entrypoint)(void *aspace),
 		void *aspace,
 		int priority) {
-	
+
 	if (ARRAY_SIZE(taskpool) <= taskpool_n) {
 		fprintf(stderr, "No mem for new task\n");
 		return;
 	}
 	struct task *t = &taskpool[taskpool_n++];
-	
+
 	t->entry = entrypoint;
 	t->as = aspace;
 	t->priority = priority;
 
 	ctx_make(&t->ctx, tasktramp, t->stack, sizeof(t->stack));
 
-	irq_disable(); // при работе с очередью нельзя давать прерываниям таймера мешать
+	irq_disable();
 	policy_run(t);
 	irq_enable();
 }
 
-
 static void bottom(void) {
-	irq_disable();
 	time += tick_period;
 
-	while (waitq != NULL && waitq->waketime <= sched_gettime()) {
-		struct task *temp = waitq;
-		policy_run(temp);
+	while (waitq && waitq->waketime <= sched_gettime()) {
+		struct task *t = waitq;
 		waitq = waitq->next;
-	} 
-
-	if (sched_gettime() - current_start >= tick_period) { // когда квант времени текущей задачи кончился - вытесняем задачу
-		policy_run(current);
-		struct task *pr = updateTask();
-		switch_ctx(pr, current);
+		policy_run(t);
 	}
 
-	irq_enable();
-
-	
+	if (tick_period <= sched_gettime() - current_start) {
+		irq_disable();
+		policy_run(current);
+		doswitch();
+		irq_enable();
+	}
 }
 
 void sched_sleep(unsigned ms) {
-	if (ms == 0) { // как sched_cont(0), просто вставка в очередь
+
+#if 0
+	if (!ms) {
 		irq_disable();
 		policy_run(current);
-		struct task *pr = updateTask();
-		switch_ctx(pr, current);
+		doswitch();
 		irq_enable();
 		return;
 	}
+#endif
 
 	current->waketime = sched_gettime() + ms;
 
-	irq_disable();
-	wait_push(current);
-	struct task *pr = updateTask();
-	switch_ctx(pr, current);
-	irq_enable();
-}
+	int curtime;
+	while ((curtime = sched_gettime()) < current->waketime) {
+		irq_disable();
+		struct task **c = &waitq;
+		while (*c && (*c)->waketime < current->waketime) {
+			c = &(*c)->next;
+		}
+		current->next = *c;
+		*c = current;
 
+		doswitch();
+		irq_enable();
+	}
+}
 
 void sched_run(int period_ms) {
 	sigemptyset(&irqs);
-	sigaddset(&irqs, SIGALRM);// сигнал того, что кончился таймер, добавлен
+	sigaddset(&irqs, SIGALRM);
 
 	tick_period = period_ms;
 	timer_init_period(period_ms, top);
@@ -205,14 +196,15 @@ void sched_run(int period_ms) {
 	irq_disable();
 
 	current = &idle;
-	while (runq != NULL || waitq != NULL) {
-		if (runq != NULL) {
+
+	while (runq || waitq) {
+		if (runq) {
 			policy_run(current);
-			struct task *pr = updateTask();
-			switch_ctx(pr, current);
-		}
-		else { // если остались только ожидающие, то ждем таймер, чтобы отправить в обработчике ожидающих на исполнение
+			doswitch();
+		} else {
 			sigsuspend(&none);
 		}
 	}
+
+	irq_enable();
 }
