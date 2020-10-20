@@ -183,7 +183,7 @@ static int app_load(int argc, char* argv[]) {
 	// Find Elf64_Ehdr -- at the very start
 	//   Elf64_Phdr -- find one with PT_LOAD, load it for execution
 	//   Find entry point (e_entry)
-	// 
+	//
 	// (we compile loadable apps such way they can be loaded at arbitrary
 	// address)
 
@@ -199,26 +199,28 @@ static int app_load(int argc, char* argv[]) {
 	if (MAP_FAILED == loaded_app) {
 		perror("mmap loaded_app");
 	}
-
+	
 	Elf64_Ehdr *header = &rawelf[0]; // начало - главный заголовок
 	Elf64_Phdr *ph_t = &rawelf[header->e_phoff]; // получили указатель на начало массива заголовков программы
-	Elf64_Half ph_n = header->e_phnum; // получили количество элементов массива
-	
+    Elf64_Half ph_n = header->e_phnum; // получили количество элементов массива
+	Elf64_Addr virt_addr;
 	for (Elf64_Phdr *curr = ph_t; curr < ph_t + ph_n; curr++) {
 		if (curr->p_type == PT_LOAD) {
-			memcpy(loaded_app, &rawelf[curr->p_offset], curr->p_filesz);
-		}
+			virt_addr = curr->p_vaddr;
+	 		memcpy(loaded_app, &rawelf[curr->p_offset], curr->p_filesz);
+			break;
+	 	}
 	}
-	int (*app) (int, char*[]) = (int (*)(int, char*[])) header->e_entry;
+	int (*app) (int, char*[]) = (int (*)(int, char*[])) &loaded_app[header->e_entry - virt_addr];
+	app(argc - 1, argv + 1);
 
-	app(argc, argv);
 
 	if (0 != munmap(loaded_app, loaded_size)) {
 		perror("munmap");
 		return 1;
 	}
 
-	return 1;
+	return argc - 2;
 }
 
 static void shell(void *ctx) {
