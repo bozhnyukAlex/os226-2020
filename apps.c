@@ -212,7 +212,7 @@ static int app_load(int argc, char* argv[]) {
 	 	}
 	}
 	int (*app) (int, char*[]) = (int (*)(int, char*[])) &loaded_app[header->e_entry - virt_addr];
-	app(argc - 1, argv + 1);
+	g_retcode = app(argc - 1, argv + 1);
 
 
 	if (0 != munmap(loaded_app, loaded_size)) {
@@ -220,7 +220,7 @@ static int app_load(int argc, char* argv[]) {
 		return 1;
 	}
 
-	return argc - 2;
+	return g_retcode;
 }
 
 static void shell(void *ctx) {
