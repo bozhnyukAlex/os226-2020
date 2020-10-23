@@ -12,12 +12,13 @@
 #include <sys/mman.h>
 
 #include "sched.h"
+#include "vm.h"
 #include "syscall.h"
 #include "util.h"
 #include "libc.h"
 
 #define APPS_X(X) \
-	X(echo) \
+	X(echo) \	
 	X(retcode) \
 	X(readmem) \
 	X(sysecho) \
@@ -107,7 +108,7 @@ static long reftime(void) {
 }
 static void print(struct app_ctx *ctx, const char *msg) {
 	printf("app1 id %d %s time %d reference %ld\n",
-		ctx - app_ctxs, msg, sched_gettime(), reftime() - refstart);
+			ctx - app_ctxs, msg, sched_gettime(), reftime() - refstart);
 	fflush(stdout);
 }
 
@@ -130,7 +131,7 @@ static void burn_entry(void *_ctx) {
 
 static int app_burn(int argc, char* argv[]) {
 	int id = atoi(argv[1]);
-        struct app_ctx *ctx = &app_ctxs[id];
+	struct app_ctx *ctx = &app_ctxs[id];
 
 	ctx->param = atoi(argv[2]);
 	void (*entry)(void*) = !strcmp(argv[0], "burn") ?
@@ -167,7 +168,7 @@ static int app_load(int argc, char* argv[]) {
 			return 1;
 		}
 		p += bytes;
-	} while (bytes > 0); // пока не достигли конца файла, при конце возвращается 0
+	} while (0 < bytes);
 	if (p == rawelf + sizeof(rawelf)) {
 		printf("unsufficient space for raw elf\n");
 		return 1;
@@ -187,40 +188,56 @@ static int app_load(int argc, char* argv[]) {
 	// (we compile loadable apps such way they can be loaded at arbitrary
 	// address)
 
-	// TODO load the app into loaded_app and run it
-
-	int loaded_size = 0x1000;
-
-
-
-	void *loaded_app = mmap(NULL, loaded_size,
-			PROT_READ | PROT_WRITE | PROT_EXEC,
-			MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-	if (MAP_FAILED == loaded_app) {
-		perror("mmap loaded_app");
-	}
-	
-	Elf64_Ehdr *header = &rawelf[0]; // начало - главный заголовок
-	Elf64_Phdr *ph_t = &rawelf[header->e_phoff]; // получили указатель на начало массива заголовков программы
-    Elf64_Half ph_n = header->e_phnum; // получили количество элементов массива
-	Elf64_Addr virt_addr;
-	for (Elf64_Phdr *curr = ph_t; curr < ph_t + ph_n; curr++) {
-		if (curr->p_type == PT_LOAD) {
-			virt_addr = curr->p_vaddr;
-	 		memcpy(loaded_app, &rawelf[curr->p_offset], curr->p_filesz);
-			break;
-	 	}
-	}
-	int (*app) (int, char*[]) = (int (*)(int, char*[])) &loaded_app[header->e_entry - virt_addr];
-	g_retcode = app(argc - 1, argv + 1);
-
-
-	if (0 != munmap(loaded_app, loaded_size)) {
-		perror("munmap");
+	const Elf64_Ehdr *ehdr = (const Elf64_Ehdr *) rawelf;
+	if (!ehdr->e_phoff ||
+			!ehdr->e_phnum ||
+			!ehdr->e_entry ||
+			ehdr->e_phentsize != sizeof(Elf64_Phdr)) {
+		printf("bad ehdr\n");
 		return 1;
 	}
+	const Elf64_Phdr *phdrs = (const Elf64_Phdr *) (rawelf + ehdr->e_phoff);
 
-	return g_retcode;
+	unsigned long maxaddr = IUSERSPACE_START;
+	for (int i = 0; i < ehdr->e_phnum; ++i) {
+		const Elf64_Phdr *ph = phdrs + i;
+		if (ph->p_type != PT_LOAD) {
+			continue;
+		}
+		if (ph->p_vaddr < IUSERSPACE_START) {
+			printf("bad section\n");
+			return 1;
+		}
+		unsigned phend = ph->p_vaddr + ph->p_memsz;
+		if (maxaddr < phend) {
+			maxaddr = phend;
+		}
+	}
+
+	if (vmbrk((void*)maxaddr)) {
+		printf("vmbrk fail\n");
+		return 1;
+	}
+	if (vmprotect(USERSPACE_START, maxaddr - IUSERSPACE_START, VM_READ | VM_WRITE)) {
+		printf("vmprotect RW failed\n");
+		return 1;
+	}
+	for (int i = 0; i < ehdr->e_phnum; ++i) {
+		const Elf64_Phdr *ph = phdrs + i;
+		if (ph->p_type != PT_LOAD) {
+			continue;
+		}
+		memcpy((void*)ph->p_vaddr, rawelf + ph->p_offset, ph->p_filesz);
+		int prot = (ph->p_flags & PF_X ? VM_EXEC  : 0) |
+			   (ph->p_flags & PF_W ? VM_WRITE : 0) |
+			   (ph->p_flags & PF_R ? VM_READ  : 0);
+		if (vmprotect((void*)ph->p_vaddr, ph->p_memsz, prot)) {
+			printf("vmprotect section failed\n");
+			return 1;
+		}
+	}
+
+	return ((int(*)(int, char**))ehdr->e_entry)(argc - 1, argv + 1);
 }
 
 static void shell(void *ctx) {
