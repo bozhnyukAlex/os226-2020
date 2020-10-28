@@ -8,6 +8,7 @@
 #include "sched.h"
 #include "ctx.h"
 #include "vm.h"
+#include <sys/mman.h>
 
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof(*a))
 
@@ -26,6 +27,8 @@ struct task {
 	void (*entry)(void *as);
 	void *as;
 	int priority;
+
+	struct map_range *m_range;
 
 	struct ctx ctx;
 
@@ -72,6 +75,10 @@ static void policy_run(struct task *t) {
 	*c = t;
 }
 
+
+
+
+
 static void hctx_push(greg_t *regs, unsigned long val) {
 	regs[REG_RSP] -= sizeof(unsigned long);
 	*(unsigned long *) regs[REG_RSP] = val;
@@ -107,6 +114,21 @@ static void doswitch(void) {
 	current = runq;
 	runq = current->next;
 
+	if (get_range_nums() > 0) {
+		printf("SWITCH! r_nums: %d\n", get_range_nums());
+		
+		struct map_range *old_range = old->m_range;
+		printf("old_range: %d - %d\n", old_range->begin, old_range->end);
+		printf("%d\n", munmap(USERSPACE_START, old_range->end - old_range->begin + 1));
+		// struct map_range *new_range = current->m_range;
+		// printf("new_range: %d - %d\n", new_range->begin, new_range->end);
+		// mmap(USERSPACE_START,
+		// 	new_range->end - new_range->begin + 1,
+		// 	PROT_READ | PROT_WRITE,
+		// 	MAP_FIXED | MAP_SHARED,
+		// 	get_fd(), new_range->begin);
+	}
+
 	current_start = sched_gettime();
 	ctx_switch(&old->ctx, &current->ctx);
 }
@@ -117,6 +139,14 @@ static void tasktramp(void) {
 	irq_disable();
 	doswitch();
 }
+
+void sched_set_range() {
+	current->m_range = get_curr_brk();
+	printf("setting_curr_range: %d - %d\n", current->m_range->begin, current->m_range->end);
+}
+
+
+
 
 void sched_new(void (*entrypoint)(void *aspace),
 		void *aspace,

@@ -221,10 +221,15 @@ static int app_load(int argc, char* argv[]) {
 		}
 	}
 
+
 	if (vmbrk((void*)maxaddr)) {
 		printf("vmbrk fail\n");
 		return 1;
 	}
+	sched_set_range();
+
+	
+
 	if (vmprotect(USERSPACE_START, maxaddr - IUSERSPACE_START, VM_READ | VM_WRITE)) {
 		printf("vmprotect RW failed\n");
 		return 1;
