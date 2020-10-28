@@ -144,11 +144,7 @@ static void tasktramp(void) {
 }
 
 void sched_set_range() {
-	if (current->m_range != NULL) {
-		printf("was_cur_range: %d - %d\n", current->m_range->begin, current->m_range->end);
-	}
 	current->m_range = get_curr_brk();
-	printf("setting_curr_range: %d - %d\n", current->m_range->begin, current->m_range->end);
 }
 
 
