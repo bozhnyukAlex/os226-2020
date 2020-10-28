@@ -8,16 +8,18 @@
 
 static int g_memfd = -1;
 static unsigned g_memsize;
+static off_t offset;
 
 int vmbrk(void *addr) {
 	if (MAP_FAILED == mmap(USERSPACE_START,
 			addr - USERSPACE_START,
 			PROT_READ | PROT_WRITE,
 			MAP_FIXED | MAP_SHARED,
-			g_memfd, 0)) {
+			g_memfd, offset)) {
 		perror("mmap g_memfd");
 		return -1;
 	}
+	
 	return 0;
 }
 
