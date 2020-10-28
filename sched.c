@@ -113,20 +113,23 @@ static void doswitch(void) {
 	struct task *old = current;
 	current = runq;
 	runq = current->next;
-
 	if (get_range_nums() > 0) {
-		printf("SWITCH! r_nums: %d\n", get_range_nums());
-		
 		struct map_range *old_range = old->m_range;
-		printf("old_range: %d - %d\n", old_range->begin, old_range->end);
-		printf("%d\n", munmap(USERSPACE_START, old_range->end - old_range->begin + 1));
-		// struct map_range *new_range = current->m_range;
-		// printf("new_range: %d - %d\n", new_range->begin, new_range->end);
-		// mmap(USERSPACE_START,
-		// 	new_range->end - new_range->begin + 1,
-		// 	PROT_READ | PROT_WRITE,
-		// 	MAP_FIXED | MAP_SHARED,
-		// 	get_fd(), new_range->begin);
+		if (old_range) {
+			munmap(USERSPACE_START, old_range->end - old_range->begin + 1);
+		}
+		
+		
+		struct map_range *new_range = current->m_range;
+		
+		if (new_range) {
+		 mmap(USERSPACE_START,
+		 	new_range->end - new_range->begin + 1,
+		 	PROT_READ | PROT_WRITE,
+		 	MAP_FIXED | MAP_SHARED,
+		 	get_fd(), new_range->begin);
+		}
+		
 	}
 
 	current_start = sched_gettime();
@@ -141,10 +144,12 @@ static void tasktramp(void) {
 }
 
 void sched_set_range() {
+	if (current->m_range != NULL) {
+		printf("was_cur_range: %d - %d\n", current->m_range->begin, current->m_range->end);
+	}
 	current->m_range = get_curr_brk();
 	printf("setting_curr_range: %d - %d\n", current->m_range->begin, current->m_range->end);
 }
-
 
 
 
@@ -161,6 +166,7 @@ void sched_new(void (*entrypoint)(void *aspace),
 	t->entry = entrypoint;
 	t->as = aspace;
 	t->priority = priority;
+	t->m_range = NULL;
 
 	ctx_make(&t->ctx, tasktramp, t->stack, sizeof(t->stack));
 

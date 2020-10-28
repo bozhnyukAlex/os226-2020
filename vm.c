@@ -16,7 +16,6 @@ static int range_n;
 static struct map_range* curr_brked = NULL;
 
 int vmbrk(void *addr) {
-	printf("IN VMBRK: \n");
 	if (MAP_FAILED == mmap(USERSPACE_START,
 			addr - USERSPACE_START,
 			PROT_READ | PROT_WRITE,
@@ -26,25 +25,21 @@ int vmbrk(void *addr) {
 		return -1;
 	}
 	
-	printf("len: %d, offset: %d\n", addr - USERSPACE_START, offset);
+	int page_cnt = ((addr - USERSPACE_START) % VM_PAGESIZE == 0)? 
+								(addr - USERSPACE_START) / VM_PAGESIZE :
+								(addr - USERSPACE_START) / VM_PAGESIZE + 1;
 	struct map_range *mr = &rangepool[range_n];
 	mr->begin = offset;
 	mr->end = offset + addr - USERSPACE_START - 1;
 	curr_brked = mr;
 	range_n++;
 	
-	offset += (addr - USERSPACE_START) + 10;
-	printf("new offset: %d\n", offset);
-	printf("OUT VMBRK: \n");
+	offset += (page_cnt * VM_PAGESIZE);
 	return 0;
 }
 
 int get_fd() {
 	return g_memfd;
-}
-
-off_t get_offset() {
-	return offset;
 }
 
 int get_range_nums() {

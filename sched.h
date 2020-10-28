@@ -32,7 +32,7 @@ extern void sched_sleep(unsigned amount);
 
 extern int sched_gettime(void);
 
-void sched_set_range();
+extern void sched_set_range();
 
 // Scheduler loop, start executing tasks until all of them finish
 extern void sched_run(int period_ms);
