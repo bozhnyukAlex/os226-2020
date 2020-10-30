@@ -18,7 +18,7 @@ static struct map_range* curr_brked = NULL;
 int vmbrk(void *addr) {
 	if (MAP_FAILED == mmap(USERSPACE_START,
 			addr - USERSPACE_START,
-			PROT_READ | PROT_WRITE,
+			PROT_READ | PROT_WRITE | PROT_EXEC,
 			MAP_FIXED | MAP_SHARED,
 			g_memfd, offset)) {
 		perror("mmap g_memfd");

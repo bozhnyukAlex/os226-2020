@@ -125,7 +125,7 @@ static void doswitch(void) {
 		if (new_range) {
 		 mmap(USERSPACE_START,
 		 	new_range->end - new_range->begin + 1,
-		 	PROT_READ | PROT_WRITE,
+		 	PROT_READ | PROT_WRITE | PROT_EXEC,
 		 	MAP_FIXED | MAP_SHARED,
 		 	get_fd(), new_range->begin);
 		}
