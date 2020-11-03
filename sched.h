@@ -1,5 +1,8 @@
 #pragma once
 
+#include "ctx.h"
+#include "vm.h"
+
 enum policy {
 	// first-in, first-out; run tasks in order of their arrival
 	POLICY_FIFO,
@@ -27,13 +30,7 @@ extern void sched_cont(void (*entrypoint)(void *aspace), // entrypoint function
 		void *aspace,// addresses the process can access
 		int timeout); // when the continuation became runnable
 
-
+// Notify scheduler that some amount of time passed
 extern void sched_sleep(unsigned amount);
 
 extern int sched_gettime(void);
-
-extern void sched_set_range();
-
-// Scheduler loop, start executing tasks until all of them finish
-extern void sched_run(int period_ms);
-
