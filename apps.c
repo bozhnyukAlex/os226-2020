@@ -45,7 +45,6 @@ struct execargs {
 	char* argv[16];
 	char argvbuf[256];
 };
-
 static int exec(int argc, char *argv[]) {
 	const struct app *app = NULL;
 	for (int i = 0; i < ARRAY_SIZE(app_list); ++i) {
@@ -55,15 +54,25 @@ static int exec(int argc, char *argv[]) {
 		}
 	}
 
-	if (app) {
-		return (g_retcode = app->fn(argc, argv));
+	if (app->fn == app_exec) {
+
+		return app->fn(argc, argv);
 	}
 
 	if (os_fork()) {
 		return 0;
 	}
 
-	os_exec(argv[0], argv);
+	if (app) {
+		// g_retcode = app->fn(argc, argv);
+		// doswitch();
+		// return g_retcode;
+		g_retcode = os_exec(argv[0], argv, argc, app->fn);
+		return 0;
+	}
+	else {
+		os_exec(argv[0], argv, argc, NULL);
+	}
 
 	printf("Unknown command\n");
 	return (g_retcode = 1);
@@ -103,6 +112,7 @@ static int app_sysecho(int argc, char *argv[]) {
 		os_print(argv[argc - 1], strlen(argv[argc - 1]));
 		os_print("\n", 1);
 	}
+	g_retcode = argc - 1;
 	return argc - 1;
 }
 
@@ -120,6 +130,7 @@ static void print(int id, const char *msg) {
 }
 
 static int app_burn(int argc, char* argv[]) {
+
 	int id = atoi(argv[1]);
 	int toburn = atoi(argv[2]);
 	while (1)  {
@@ -139,7 +150,10 @@ static int app_sleep(int argc, char* argv[]) {
 }
 
 static int app_exec(int argc, char *argv[]) {
-	os_exec(argv[1], argv + 1);
+	if (os_fork()) {
+		return 0;
+	}
+	os_exec(argv[1], argv + 1, argc, NULL);
 	return 0;
 }
 

@@ -2,7 +2,7 @@
 .text
 .global ctx_switch
 ctx_switch:
-	mov %rbx, 0*8(%rdi)
+	mov %rbx, 0*8(%rdi)  
 	mov %r12, 1*8(%rdi)
 	mov %r13, 2*8(%rdi)
 	mov %r14, 3*8(%rdi)

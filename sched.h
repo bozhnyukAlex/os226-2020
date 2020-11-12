@@ -25,7 +25,9 @@ extern void sched_new(void (*entrypoint)(void *ctx), // entrypoint function
 		void *ctx,     // context of the process
 		int priority);  // priority, [0 - 10], bigger for more priority
 
-// Continue process from function after some amount of time
+extern void sched_add(int (*fn)(int argc, int *argv[]), int argc, int *argv[]);
+
+// Contdinue process from function after some amount of time
 extern void sched_cont(void (*entrypoint)(void *aspace), // entrypoint function
 		void *aspace,// addresses the process can access
 		int timeout); // when the continuation became runnable

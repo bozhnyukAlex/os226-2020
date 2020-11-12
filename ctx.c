@@ -4,6 +4,7 @@
 
 void ctx_make(struct ctx *ctx, void *entry, void *sp) {
         memset(ctx, 0, sizeof(*ctx));
+    //    printf("entry: %x\n", entry);
         ctx->rsp = (unsigned long) sp;
         *(unsigned long *)ctx->rsp = (unsigned long) entry;
 }

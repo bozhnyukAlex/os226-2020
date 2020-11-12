@@ -43,6 +43,16 @@ typedef unsigned long (*sys_call_t)(struct hctx *hctx,
 #define SC_TRAMPOLINE(name, ret, n, ...) \
 	SC_TRAMPOLINE ## n (ret, name, ## __VA_ARGS__)
 SYSCALL_X(SC_TRAMPOLINE)
+
+/*
+	SC_TRAMPOLINE(execl, int, 2, const char*, path, char *const *, argv) -->
+	SC_TRAMPOLINE2(int, execl, 2, const char*, path, char *const *, argv) -->
+
+	int sys_fork(struct hctx*); \
+	static unsigned long sys_tr_fork(struct hctx *hctx, unsigned long arg1, unsigned long arg2, unsigned long arg3, unsigned long arg4, void *rest) { \
+		return (int) sys_fork(hctx); \
+	}
+*/
 #undef SC_TRAMPOLINE0
 #undef SC_TRAMPOLINE1
 #undef SC_TRAMPOLINE2
@@ -59,10 +69,9 @@ static const sys_call_t sys_table[] = {
 
 
 void syscall_bottom(struct hctx *hctx) {
-        hctx->rax = sys_table[hctx->rax](hctx,
-			hctx->rbx, hctx->rcx,
-			hctx->rdx, hctx->rsi,
-			(void *) hctx->rdi);
+		int a = hctx->rax;
+        hctx->rax = sys_table[a](hctx, hctx->rbx, hctx->rcx, hctx->rdx, hctx->rsi, (void *) hctx->rdi);
+		//printf("HCTX->RAX after sys_fork: %d \n", hctx->rax);
 }
 
 int sys_print(struct hctx *hctx, char *str, int len) {

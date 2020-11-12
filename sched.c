@@ -43,6 +43,7 @@ struct task {
 	};
 
 	int priority;
+	int id;
 
 	// timeout support
 	int waketime;
@@ -129,6 +130,7 @@ struct task *sched_current(void) {
 	return current;
 }
 
+
 int sched_gettime(void) {
 	int cnt1 = timer_cnt();
 	int time1 = time;
@@ -140,7 +142,7 @@ int sched_gettime(void) {
 		time2 + cnt2;
 }
 
-static void doswitch(void) {
+void doswitch(void) {
 	struct task *old = current;
 	current = runq;
 	runq = current->next;
@@ -158,7 +160,16 @@ static void exectramp(void) {
 	doswitch();
 }
 
-int sys_exec(struct hctx *hctx, const char *path, char *const argv[]) {
+int sys_exec(struct hctx *hctx, const char *path, char *const argv[], int argc, main_t func) {
+
+	if (func) {
+		irq_enable();
+		unsigned long result = func(argc, argv);
+		doswitch();
+		irq_disable();
+		hctx->rax = result;
+		return result;
+	}
 	char elfpath[32];
 	snprintf(elfpath, sizeof(elfpath), "%s.app", path);
 	int fd = open(elfpath, O_RDONLY);
@@ -169,7 +180,10 @@ int sys_exec(struct hctx *hctx, const char *path, char *const argv[]) {
 
 	void *rawelf = mmap(NULL, 128 * 1024, PROT_READ, MAP_PRIVATE, fd, 0);
 
-	if (strncmp(rawelf, "\x7f" "ELF" "\x2", 5)) {
+	if (strncmp(rawelf, "\x7f"
+						"ELF"
+						"\x2",
+				5)) {
 		printf("ELF header mismatch\n");
 		return 1;
 	}
@@ -183,34 +197,35 @@ int sys_exec(struct hctx *hctx, const char *path, char *const argv[]) {
 	// (we compile loadable apps such way they can be loaded at arbitrary
 	// address)
 
-	const Elf64_Ehdr *ehdr = (const Elf64_Ehdr *) rawelf;
+	const Elf64_Ehdr *ehdr = (const Elf64_Ehdr *)rawelf;
 	if (!ehdr->e_phoff ||
-			!ehdr->e_phnum ||
-			!ehdr->e_entry ||
-			ehdr->e_phentsize != sizeof(Elf64_Phdr)) {
+		!ehdr->e_phnum ||
+		!ehdr->e_entry ||
+		ehdr->e_phentsize != sizeof(Elf64_Phdr)) {
 		printf("bad ehdr\n");
 		return 1;
 	}
-	const Elf64_Phdr *phdrs = (const Elf64_Phdr *) (rawelf + ehdr->e_phoff);
+	const Elf64_Phdr *phdrs = (const Elf64_Phdr *)(rawelf + ehdr->e_phoff);
 
 	void *maxaddr = USERSPACE_START;
 	for (int i = 0; i < ehdr->e_phnum; ++i) {
 		const Elf64_Phdr *ph = phdrs + i;
-		if (ph->p_type != PT_LOAD) {
+		if (ph->p_type != PT_LOAD)
+		{
 			continue;
 		}
 		if (ph->p_vaddr < IUSERSPACE_START) {
 			printf("bad section\n");
 			return 1;
 		}
-		void *phend = (void*)(ph->p_vaddr + ph->p_memsz);
+		void *phend = (void *)(ph->p_vaddr + ph->p_memsz);
 		if (maxaddr < phend) {
 			maxaddr = phend;
 		}
 	}
 
 	char **copyargv = USERSPACE_START + MAX_USER_MEM - VM_PAGESIZE;
-	char *copybuf = (char*)(copyargv + 32);
+	char *copybuf = (char *)(copyargv + 32);
 	char *const *arg = argv;
 	char **copyarg = copyargv;
 	while (*arg) {
@@ -235,11 +250,11 @@ int sys_exec(struct hctx *hctx, const char *path, char *const argv[]) {
 		if (ph->p_type != PT_LOAD) {
 			continue;
 		}
-		memcpy((void*)ph->p_vaddr, rawelf + ph->p_offset, ph->p_filesz);
-		int prot = (ph->p_flags & PF_X ? VM_EXEC  : 0) |
-			   (ph->p_flags & PF_W ? VM_WRITE : 0) |
-			   (ph->p_flags & PF_R ? VM_READ  : 0);
-		if (vmprotect((void*)ph->p_vaddr, ph->p_memsz, prot)) {
+		memcpy((void *)ph->p_vaddr, rawelf + ph->p_offset, ph->p_filesz);
+		int prot = (ph->p_flags & PF_X ? VM_EXEC : 0) |
+				   (ph->p_flags & PF_W ? VM_WRITE : 0) |
+				   (ph->p_flags & PF_R ? VM_READ : 0);
+		if (vmprotect((void *)ph->p_vaddr, ph->p_memsz, prot)) {
 			printf("vmprotect section failed\n");
 			return 1;
 		}
@@ -247,10 +262,10 @@ int sys_exec(struct hctx *hctx, const char *path, char *const argv[]) {
 
 	struct ctx dummy;
 	struct ctx new;
-	ctx_make(&new, exectramp, (char*)copyargv - 16);
+	ctx_make(&new, exectramp, (char *)copyargv - 16);
 
 	irq_disable();
-	current->main = (void*)ehdr->e_entry;
+	current->main = (void *)ehdr->e_entry;
 	current->argv = copyargv;
 	current->argc = copyarg - copyargv;
 	ctx_switch(&dummy, &new);
@@ -261,11 +276,26 @@ static void forktramp(void) {
 	exittramp();
 }
 
+void sched_add(int (*fn)(int argc, int* argv[]), int argc, int* argv[]) {
+ 	struct task *t = &taskpool[taskpool_n++];
+ 	vmctx_make(&t->vmctx);
+ 	vmmakestack(&t->vmctx);
+ 	irq_disable();
+	ctx_make(&t->ctx, fn, USERSPACE_START + MAX_USER_MEM - VM_PAGESIZE - 16);
+	t->main = fn;
+ 	t->argc = argc;
+ 	t->argv = argv;
+	policy_run(t); // Не понятно, как передавать аргументы
+	
+}
+
 int sys_fork(struct hctx *hctx) {
+	//printf("SYS_FORK\n");
 	struct task *t = &taskpool[taskpool_n++];
 	hctx->rax = 0;
 	vmctx_copy(&t->vmctx, &current->vmctx);
 	ctx_make(&t->ctx, forktramp, t->stack + sizeof(t->stack) - 16);
+	t->ctx.rbx = hctx;
 	policy_run(t);
 	return t - taskpool;
 }
@@ -354,8 +384,8 @@ static void sched_run(int period_ms) {
 	}
 
 	tick_period = period_ms;
-	/*timer_init_period(period_ms, alrmtop);*/
-
+	timer_init_period(period_ms, alrmtop);
+	//idle.id = -42;
 	current = &idle;
 	vmctx_make(&current->vmctx);
 
@@ -384,6 +414,7 @@ static void segvtop(int sig, siginfo_t *info, void *ctx) {
 
 	hctx_call(regs, syscall_bottom);
 }
+
 
 int main(int argc, char *argv[]) {
 	struct sigaction act = {

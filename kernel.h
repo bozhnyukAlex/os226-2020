@@ -39,6 +39,9 @@ void syscall_bottom(struct hctx *hctx);
 #define SC_DECLARE(name, ret, n, ...) \
 	SC_DECLARE ## n (ret, name, ## __VA_ARGS__)
 SYSCALL_X(SC_DECLARE)
+/*
+	int sys_fork(struct hctx*);
+*/
 #undef SC_DECLARE0
 #undef SC_DECLARE1
 #undef SC_DECLARE2
