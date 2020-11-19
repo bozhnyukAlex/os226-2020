@@ -170,7 +170,7 @@ static void doswitch(void)
 static void exectramp(void)
 {
 	irq_enable();
-	current->main(current->argc, current->argv);
+	sys_exit((struct hctx *)current->ctx.rbx, current->main(current->argc, current->argv));
 	irq_disable();
 	doswitch();
 }
