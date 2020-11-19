@@ -65,19 +65,23 @@ static void exec(int argc, char *argv[])
 
 	if (app && (app->flags & SHELL_BUILTIN))
 	{
+
 		g_retcode = app->fn(argc, argv);
 		return;
 	}
 
 	int pid = os_fork();
-	if (pid)
+	if (pid) // for parent
 	{
+
 		os_waitpid(pid, &g_retcode);
+
 		return;
 	}
-
+	// for child
 	if (app)
 	{
+		
 		os_exit(app->fn(argc, argv));
 	}
 

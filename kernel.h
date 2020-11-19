@@ -2,7 +2,8 @@
 
 #include "syscall.h"
 
-struct hctx {
+struct hctx
+{
 	unsigned long rax;
 	unsigned long rbx;
 	unsigned long rcx;
@@ -25,19 +26,19 @@ struct hctx {
 void syscall_bottom(struct hctx *hctx);
 
 #define SC_DECLARE0(ret, name) \
-	ret sys_ ## name(struct hctx*);
+	ret sys_##name(struct hctx *);
 #define SC_DECLARE1(ret, name, type1, name1) \
-	ret sys_ ## name(struct hctx*, type1);
+	ret sys_##name(struct hctx *, type1);
 #define SC_DECLARE2(ret, name, type1, name1, type2, name2) \
-	ret sys_ ## name(struct hctx*, type1, type2);
+	ret sys_##name(struct hctx *, type1, type2);
 #define SC_DECLARE3(ret, name, type1, name1, type2, name2, type3, name3) \
-	ret sys_ ## name(struct hctx*, type1, type2, type3);
+	ret sys_##name(struct hctx *, type1, type2, type3);
 #define SC_DECLARE4(ret, name, type1, name1, type2, name2, type3, name3, type4, name4) \
-	ret sys_ ## name(struct hctx*, type1, type2, type3, type4);
+	ret sys_##name(struct hctx *, type1, type2, type3, type4);
 #define SC_DECLARE5(ret, name, type1, name1, type2, name2, type3, name3, type4, name4, type5, name5) \
-	ret sys_ ## name(struct hctx*, type1, type2, type3, type4, void*);
+	ret sys_##name(struct hctx *, type1, type2, type3, type4, void *);
 #define SC_DECLARE(name, ret, n, ...) \
-	SC_DECLARE ## n (ret, name, ## __VA_ARGS__)
+	SC_DECLARE##n(ret, name, ##__VA_ARGS__)
 SYSCALL_X(SC_DECLARE)
 /*
 	int sys_fork(struct hctx*);
